@@ -99,10 +99,6 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 	}
 
 	callerID := r.Header.Get("X-ACE-ID")
-	if callerID == "" {
-		writeError(w, http.StatusBadRequest, "X-ACE-ID header is required")
-		return
-	}
 
 	var req matchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -115,16 +115,33 @@ func TestServerIn(t *testing.T) {
 	}
 }
 
-func TestServerMissingID(t *testing.T) {
+func TestServerNoIDAllowed(t *testing.T) {
 	srv := newTestServer(t)
 
-	body := `{"pattern":{"a":1}}`
-	req := httptest.NewRequest("POST", "/in", bytes.NewBufferString(body))
+	// Write an unrestricted object.
+	outBody := `{"object":{"a":1}}`
+	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(outBody))
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("out: expected 200, got %d", w.Code)
+	}
 
-	if w.Code != 400 {
-		t.Fatalf("expected 400, got %d", w.Code)
+	// Read without X-ACE-ID header.
+	rdBody := `{"pattern":{"a":1}}`
+	req = httptest.NewRequest("POST", "/rd", bytes.NewBufferString(rdBody))
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("rd: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp Result
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID == "" {
+		t.Fatal("expected result without X-ACE-ID for unrestricted object")
 	}
 }
 
