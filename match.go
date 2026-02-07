@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// Match reports whether an object matches a pattern. It does not require a database.
 func Match(object, pattern json.RawMessage) (bool, error) {
 	branches, err := ExtractBranches(object)
 	if err != nil {

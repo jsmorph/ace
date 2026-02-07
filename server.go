@@ -7,12 +7,15 @@ import (
 	"time"
 )
 
+// Server exposes a Space over HTTP.
 type Server struct {
 	space   *Space
 	mux     *http.ServeMux
 	waitSem chan struct{}
 }
 
+// NewServer returns an HTTP handler for the given space. If maxWaiters is
+// positive, it limits concurrent blocking clients.
 func NewServer(space *Space, maxWaiters int) *Server {
 	srv := &Server{space: space}
 	if maxWaiters > 0 {
@@ -30,6 +33,7 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	return srv
 }
 
+// ServeHTTP implements http.Handler.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	srv.mux.ServeHTTP(w, r)
 }

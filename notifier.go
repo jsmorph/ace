@@ -10,19 +10,22 @@ import (
 	"quamina.net/go/quamina"
 )
 
-type waiterID uint64
+// WaiterID identifies a registered pattern for deregistration.
+type WaiterID uint64
 
 type waiter struct {
 	ch chan struct{}
 }
 
+// Notifier wakes blocked In and Rd callers when a matching object arrives.
 type Notifier struct {
 	mu      sync.Mutex
 	q       *quamina.Quamina
-	waiters map[waiterID]*waiter
+	waiters map[WaiterID]*waiter
 	nextID  atomic.Uint64
 }
 
+// NewNotifier returns a Notifier backed by a Quamina matching engine.
 func NewNotifier() (*Notifier, error) {
 	q, err := quamina.New(quamina.WithPatternDeletion(true))
 	if err != nil {
@@ -30,17 +33,18 @@ func NewNotifier() (*Notifier, error) {
 	}
 	return &Notifier{
 		q:       q,
-		waiters: make(map[waiterID]*waiter),
+		waiters: make(map[WaiterID]*waiter),
 	}, nil
 }
 
-func (n *Notifier) Register(pattern json.RawMessage) (waiterID, <-chan struct{}, error) {
+// Register adds a pattern and returns a channel that signals when a matching object arrives.
+func (n *Notifier) Register(pattern json.RawMessage) (WaiterID, <-chan struct{}, error) {
 	qp, err := ToQuaminaPattern(pattern)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	id := waiterID(n.nextID.Add(1))
+	id := WaiterID(n.nextID.Add(1))
 	w := &waiter{ch: make(chan struct{}, 1)}
 
 	n.mu.Lock()
@@ -53,13 +57,15 @@ func (n *Notifier) Register(pattern json.RawMessage) (waiterID, <-chan struct{},
 	return id, w.ch, nil
 }
 
-func (n *Notifier) Deregister(id waiterID) {
+// Deregister removes a previously registered pattern.
+func (n *Notifier) Deregister(id WaiterID) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	delete(n.waiters, id)
 	n.q.DeletePatterns(id)
 }
 
+// Notify tests an object against all registered patterns and signals matching waiters.
 func (n *Notifier) Notify(object json.RawMessage) error {
 	n.mu.Lock()
 	matches, err := n.q.MatchesForEvent([]byte(object))
@@ -69,7 +75,7 @@ func (n *Notifier) Notify(object json.RawMessage) error {
 	}
 	var targets []chan struct{}
 	for _, x := range matches {
-		wid := x.(waiterID)
+		wid := x.(WaiterID)
 		if w, ok := n.waiters[wid]; ok {
 			targets = append(targets, w.ch)
 		}
@@ -85,6 +91,7 @@ func (n *Notifier) Notify(object json.RawMessage) error {
 	return nil
 }
 
+// ToQuaminaPattern converts an ACE pattern to Quamina format by wrapping atomic leaves in arrays.
 func ToQuaminaPattern(acePattern json.RawMessage) (json.RawMessage, error) {
 	var obj map[string]interface{}
 	if err := json.Unmarshal(acePattern, &obj); err != nil {

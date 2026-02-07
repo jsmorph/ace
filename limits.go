@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Limits constrains object, pattern, access, and TTL parameters.
 type Limits struct {
 	ObjectSize          int           `json:"object_size"`
 	PropertySize        int           `json:"property_size"`
@@ -23,6 +24,7 @@ type Limits struct {
 	IDSize              int           `json:"id_size"`
 }
 
+// DefaultLimits returns the default limits.
 func DefaultLimits() Limits {
 	return Limits{
 		ObjectSize:          2048,
@@ -41,6 +43,7 @@ func DefaultLimits() Limits {
 	}
 }
 
+// ValidateObject checks an object against size, leaf, and array limits.
 func (l Limits) ValidateObject(raw []byte) error {
 	if len(raw) > l.ObjectSize {
 		return fmt.Errorf("object size is %d > %d bytes", len(raw), l.ObjectSize)
@@ -113,6 +116,7 @@ func (l Limits) walkObject(obj map[string]interface{}, path string) (int, error)
 	return leaves, nil
 }
 
+// ValidatePattern checks a pattern against size, leaf, and array limits.
 func (l Limits) ValidatePattern(raw []byte) error {
 	if len(raw) > l.PatternSize {
 		return fmt.Errorf("pattern size is %d > %d bytes", len(raw), l.PatternSize)
@@ -185,6 +189,7 @@ func (l Limits) walkPattern(obj map[string]interface{}, path string) (int, error
 	return leaves, nil
 }
 
+// ValidateAccess checks an access value against size and length limits.
 func (l Limits) ValidateAccess(raw []byte) error {
 	if len(raw) > l.AccessSize {
 		return fmt.Errorf("access size is %d > %d bytes", len(raw), l.AccessSize)
@@ -210,6 +215,7 @@ func (l Limits) ValidateAccess(raw []byte) error {
 	return nil
 }
 
+// ValidateTTL checks that a TTL is positive and within the maximum.
 func (l Limits) ValidateTTL(d time.Duration) error {
 	if d > l.TTLMax {
 		return fmt.Errorf("ttl %v exceeds maximum %v", d, l.TTLMax)
@@ -220,6 +226,7 @@ func (l Limits) ValidateTTL(d time.Duration) error {
 	return nil
 }
 
+// ValidateCallerID checks that a caller ID is within the size limit.
 func (l Limits) ValidateCallerID(id string) error {
 	if len(id) > l.IDSize {
 		return fmt.Errorf("caller ID is %d > %d bytes", len(id), l.IDSize)
@@ -227,6 +234,7 @@ func (l Limits) ValidateCallerID(id string) error {
 	return nil
 }
 
+// Access restricts which callers may retrieve an object.
 type Access struct {
 	In []string `json:"in,omitempty"`
 	Rd []string `json:"rd,omitempty"`

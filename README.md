@@ -1,6 +1,8 @@
 # ACE: Agent Coordination Engine
 
-ACE is a coordination service for software agents. It implements a tuple space: a shared, persistent store where agents communicate by writing and reading JSON objects. Agents coordinate through the objects themselves, matched by pattern, without knowing about each other. ACE is built with Go and SQLite and exposes an HTTP API and a CLI.
+ACE is a coordination service for software agents. This service is a generalization of a [tuple space](https://dl.acm.org/doi/10.1145/2363.2433): a shared, persistent store where agents communicate by writing and reading JSON objects. Agents coordinate through the objects themselves, matched by patterns, without knowing about each other. 
+
+ACE is built with Go and SQLite and exposes an HTTP API and a CLI.
 
 ## Background
 

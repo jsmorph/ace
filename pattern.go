@@ -7,10 +7,12 @@ import (
 	"time"
 )
 
+// PatternBranch holds the alternative branch strings for one pattern leaf.
 type PatternBranch struct {
 	Alternatives []string
 }
 
+// ExtractPatternBranches returns the branches for a JSON pattern.
 func ExtractPatternBranches(data []byte) ([]PatternBranch, error) {
 	var obj map[string]interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {
@@ -63,6 +65,7 @@ func extractPatternFromObject(obj map[string]interface{}, path []string, out *[]
 	return nil
 }
 
+// BuildMatchQuery constructs the SQL query that finds the earliest matching object.
 func BuildMatchQuery(branches []PatternBranch, accessType string, callerID string, since string, now time.Time) (string, []interface{}) {
 	var b strings.Builder
 	var args []interface{}

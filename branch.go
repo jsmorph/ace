@@ -7,6 +7,7 @@ import (
 	"strings"
 )
 
+// ExtractBranches returns the root-to-leaf branch strings for a JSON object.
 func ExtractBranches(data []byte) ([]string, error) {
 	var obj map[string]interface{}
 	if err := json.Unmarshal(data, &obj); err != nil {

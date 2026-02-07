@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// ParseISO8601Duration parses a subset of ISO 8601 durations (P1D, PT1H30M, etc.)
+// into a time.Duration.
 func ParseISO8601Duration(s string) (time.Duration, error) {
 	if len(s) == 0 || s[0] != 'P' {
 		return 0, fmt.Errorf("duration must start with P: %q", s)

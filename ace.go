@@ -1,3 +1,4 @@
+// Package ace implements a tuple-space coordination service for software agents.
 package ace
 
 import (
@@ -17,6 +18,7 @@ import (
 
 const defaultTTL = 72 * time.Hour
 
+// Space is a tuple space backed by SQLite.
 type Space struct {
 	db       *sql.DB
 	idgen    *IDGen
@@ -25,12 +27,14 @@ type Space struct {
 	stop     chan struct{}
 }
 
+// Result holds an object returned by In or Rd.
 type Result struct {
 	ID       string          `json:"id"`
 	Object   json.RawMessage `json:"object"`
 	DeleteID string          `json:"delete_id,omitempty"`
 }
 
+// NewSpace opens or creates a tuple space at the given database path.
 func NewSpace(dbPath string, cfg Config) (*Space, error) {
 	switch cfg.Blocking {
 	case BlockingPoll, BlockingNotify:
@@ -67,11 +71,13 @@ func NewSpace(dbPath string, cfg Config) (*Space, error) {
 	return s, nil
 }
 
+// Close shuts down the space and closes the database.
 func (s *Space) Close() error {
 	close(s.stop)
 	return s.db.Close()
 }
 
+// Limits returns the active limits.
 func (s *Space) Limits() Limits {
 	return s.cfg.Limits
 }
@@ -89,6 +95,7 @@ func (s *Space) logSlowOp(desc string) func() {
 	}
 }
 
+// Out writes an object into the space. If ttl is zero, the default (72 hours) is used.
 func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (retID string, retErr error) {
 	defer s.logSlowOp("out")()
 	if ttl == 0 {
@@ -172,10 +179,13 @@ func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (
 	return id, nil
 }
 
+// In finds and removes the earliest matching object. If wait is positive and no
+// match exists, In blocks until a match appears or the deadline passes.
 func (s *Space) In(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string) (*Result, error) {
 	return s.fetch(ctx, callerID, pattern, wait, since, "in", true)
 }
 
+// Rd finds the earliest matching object without removing it. Blocking behavior matches In.
 func (s *Space) Rd(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string) (*Result, error) {
 	return s.fetch(ctx, callerID, pattern, wait, since, "rd", false)
 }
@@ -353,6 +363,8 @@ func (s *Space) poll(ctx context.Context, queryFn func() (*Result, error), deadl
 	}
 }
 
+// Del permanently deletes an object using the delete_id returned by In
+// when explicit deletes are enabled.
 func (s *Space) Del(deleteID string) (bool, error) {
 	defer s.logSlowOp("del")()
 	if deleteID == "" {
@@ -378,6 +390,7 @@ func generateDeleteID() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// DeleteExpired removes all objects past their TTL and returns the count deleted.
 func (s *Space) DeleteExpired() (int64, error) {
 	defer s.logSlowOp("delete expired")()
 	now := time.Now().UTC().Format(idFormat)
@@ -403,6 +416,7 @@ func canonicalize(raw json.RawMessage) (json.RawMessage, error) {
 	return b[:len(b)-1], nil // Encode appends a newline
 }
 
+// Stats reports storage statistics.
 type Stats struct {
 	Objects           int     `json:"objects"`
 	Expired           int     `json:"expired"`
@@ -414,6 +428,7 @@ type Stats struct {
 	AvgAccessRd       float64 `json:"avg_access_rd_per_object"`
 }
 
+// Stats returns storage statistics.
 func (s *Space) Stats() (*Stats, error) {
 	defer s.logSlowOp("stats")()
 	var st Stats
