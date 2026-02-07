@@ -8,12 +8,12 @@ Object values are limited to 128 bytes by default. ACE is a coordination service
 
 A developer runs an orchestrator agent that decomposes a coding task into subtasks. Worker agents claim subtasks and produce results. A reviewer agent checks each result.
 
-The orchestrator posts two subtasks. The `#instructions` property is metadata: stored and returned to the worker but excluded from pattern matching, since no agent would match against a free-text instruction string.
+The orchestrator posts two subtasks. Properties prefixed with `#` are metadata: stored and returned to the consumer but excluded from pattern matching. The `#instructions` and `#label` fields below carry free text that no agent would match against.
 
 ```
-ace out --object '{"type":"code-task","label":"implement parser","module":"parser","language":"go","#instructions":"Write a recursive descent parser for the expression grammar in grammar.md"}'
+ace out --object '{"type":"code-task","#label":"implement parser","module":"parser","language":"go","#instructions":"Write a recursive descent parser for the expression grammar in grammar.md"}'
 
-ace out --object '{"type":"code-task","label":"implement evaluator","module":"evaluator","language":"go","#instructions":"Write an evaluator that walks the AST produced by the parser"}'
+ace out --object '{"type":"code-task","#label":"implement evaluator","module":"evaluator","language":"go","#instructions":"Write an evaluator that walks the AST produced by the parser"}'
 ```
 
 A worker agent claims any available Go coding task:
@@ -25,7 +25,7 @@ ace in --pattern '{"type":"code-task","language":"go"}'
 Output:
 
 ```json
-{"id":"2025-07-14T10:00:00.000000001","object":{"#instructions":"Write a recursive descent parser for the expression grammar in grammar.md","label":"implement parser","language":"go","module":"parser","type":"code-task"}}
+{"id":"2025-07-14T10:00:00.000000001","object":{"#instructions":"Write a recursive descent parser for the expression grammar in grammar.md","#label":"implement parser","language":"go","module":"parser","type":"code-task"}}
 ```
 
 The `in` operation consumed (removed) this object. The remaining task for the evaluator is still in the space. Note that keys in the returned object are in lexicographic order: ACE canonicalizes all objects on storage.
@@ -51,7 +51,7 @@ ace rd --pattern '{"type":"code-result","files":"parser.go"}'
 After reviewing, the reviewer posts a verdict:
 
 ```
-ace out --object '{"type":"review","module":"parser","verdict":"approved","notes":"Tests pass. Parser handles all grammar productions."}'
+ace out --object '{"type":"review","module":"parser","verdict":"approved","#notes":"Tests pass. Parser handles all grammar productions."}'
 ```
 
 The orchestrator can iterate over all review verdicts using `since`. It reads the first one:
@@ -73,15 +73,15 @@ A research coordinator posts questions. Searcher agents find relevant sources. A
 The coordinator posts a question with a one-day TTL:
 
 ```
-ace out --object '{"type":"question","topic":"sqlite-wal","question":"What are the tradeoffs of WAL mode vs DELETE mode in SQLite for single-writer workloads?"}' --ttl P1D
+ace out --object '{"type":"question","topic":"sqlite-wal","#question":"What are the tradeoffs of WAL mode vs DELETE mode in SQLite for single-writer workloads?"}' --ttl P1D
 ```
 
 Two searcher agents work independently. Each finds sources and posts them:
 
 ```
-ace out --object '{"type":"source","topic":"sqlite-wal","title":"SQLite WAL mode documentation","url":"https://sqlite.org/wal.html","summary":"Official documentation covering WAL advantages and limitations"}' --ttl P1D
+ace out --object '{"type":"source","topic":"sqlite-wal","#title":"SQLite WAL mode documentation","url":"https://sqlite.org/wal.html","#summary":"Official documentation covering WAL advantages and limitations"}' --ttl P1D
 
-ace out --object '{"type":"source","topic":"sqlite-wal","title":"Write-Ahead Logging","url":"https://sqlite.org/draft/wal.html","summary":"Technical description of the WAL file format and checkpoint mechanism"}' --ttl P1D
+ace out --object '{"type":"source","topic":"sqlite-wal","#title":"Write-Ahead Logging","url":"https://sqlite.org/draft/wal.html","#summary":"Technical description of the WAL file format and checkpoint mechanism"}' --ttl P1D
 ```
 
 The analyst reads all sources for the topic without consuming them. It reads the first:
@@ -148,7 +148,7 @@ After resolving the issue, the billing agent posts a resolution that anyone can 
 
 ```
 ace out --db shared.db \
-  --object '{"type":"resolution","ticket":"TK-4821","department":"billing","outcome":"Refund issued for duplicate charge"}'
+  --object '{"type":"resolution","ticket":"TK-4821","department":"billing","#outcome":"Refund issued for duplicate charge"}'
 ```
 
 The compliance agent reads the resolution by ticket number:
