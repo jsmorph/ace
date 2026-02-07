@@ -3,16 +3,20 @@ package ace
 import (
 	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
 	s := newTestSpace(t)
-	return NewServer(s)
+	return NewServer(s, 0)
 }
 
 func TestServerOut(t *testing.T) {
@@ -232,4 +236,136 @@ func TestServerNoMatchReturnsNull(t *testing.T) {
 	if w.Body.String() != "null\n" {
 		t.Fatalf("expected null, got %s", w.Body.String())
 	}
+}
+
+func newTestServerHTTP(t *testing.T, maxWaiters int) (*httptest.Server, *Space) {
+	t.Helper()
+	cfg := DefaultConfig()
+	cfg.Blocking = BlockingNotify
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	space, err := NewSpace(dbPath, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := space.Close(); err != nil {
+			t.Errorf("close: %v", err)
+		}
+	})
+	srv := NewServer(space, maxWaiters)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+	return ts, space
+}
+
+func TestServerMaxWaitersRejectsExcess(t *testing.T) {
+	ts, _ := newTestServerHTTP(t, 1)
+
+	// First blocking request fills the semaphore.
+	blocked := make(chan int, 1)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		body := `{"pattern":{"z":1},"wait":1}`
+		req, err := http.NewRequest("POST", ts.URL+"/in", strings.NewReader(body))
+		if err != nil {
+			t.Errorf("new request: %v", err)
+			return
+		}
+		req.Header.Set("X-ACE-ID", "blocker")
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Errorf("blocker request: %v", err)
+			return
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+		blocked <- resp.StatusCode
+	}()
+
+	// Give the blocker time to enter the wait.
+	time.Sleep(200 * time.Millisecond)
+
+	// Second blocking request should get 503.
+	body := `{"pattern":{},"wait":1}`
+	req, err := http.NewRequest("POST", ts.URL+"/in", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-ACE-ID", "rejected")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != 503 {
+		t.Fatalf("expected 503, got %d", resp.StatusCode)
+	}
+
+	wg.Wait()
+	code := <-blocked
+	if code != 200 {
+		t.Fatalf("blocker expected 200, got %d", code)
+	}
+}
+
+func TestServerMaxWaitersAllowsNonBlocking(t *testing.T) {
+	ts, space := newTestServerHTTP(t, 1)
+
+	// Write an object so the non-blocking request has something to find.
+	_, err := space.Out(json.RawMessage(`{"a":1}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Fill the semaphore with a blocking request.
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		body := `{"pattern":{"nope":1},"wait":5}`
+		req, err := http.NewRequest("POST", ts.URL+"/rd", strings.NewReader(body))
+		if err != nil {
+			t.Errorf("new request: %v", err)
+			return
+		}
+		req.Header.Set("X-ACE-ID", "blocker")
+		resp, err := ts.Client().Do(req)
+		if err != nil {
+			t.Errorf("blocker: %v", err)
+			return
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+
+	// Non-blocking request (no wait) should pass through.
+	body := `{"pattern":{"a":1}}`
+	req, err := http.NewRequest("POST", ts.URL+"/rd", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("X-ACE-ID", "nonblocking")
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("non-blocking request expected 200, got %d", resp.StatusCode)
+	}
+
+	// Unblock the blocker by writing a matching object.
+	_, err = space.Out(json.RawMessage(`{"nope":1}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wg.Wait()
 }

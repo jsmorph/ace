@@ -212,7 +212,16 @@ All subcommands also accept `--db FILENAME`, which defaults to
       control the number of virtual clients, number of requests, the
       polling implementation, etc.  These parameters should be exposed
       on the command line.  This test should use the HTTP API.
-	  
+
+- [ ]  Write a README.md.  This document should describe this project,
+       its goals and motivation (about agent coordination), show
+       from-scratch usage and examples, and offer some background.
+       The background should include tuple spaces, a little about
+       Quamina and that general approach to event processing, and even
+       a nod to Peter Norvig's patmatch. You are *not* selling.  All
+       of this is factual and tight.  See CLAUDE.md and follow those
+       instructions.
+
 ## Roadmap
 
  For later. Do *not* pursue now.

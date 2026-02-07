@@ -8,12 +8,16 @@ import (
 )
 
 type Server struct {
-	space *Space
-	mux   *http.ServeMux
+	space   *Space
+	mux     *http.ServeMux
+	waitSem chan struct{}
 }
 
-func NewServer(space *Space) *Server {
+func NewServer(space *Space, maxWaiters int) *Server {
 	srv := &Server{space: space}
+	if maxWaiters > 0 {
+		srv.waitSem = make(chan struct{}, maxWaiters)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/out", srv.handleOut)
 	mux.HandleFunc("/in", srv.handleIn)
@@ -112,6 +116,16 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 	}
 
 	wait := time.Duration(req.Wait * float64(time.Second))
+
+	if wait > 0 && srv.waitSem != nil {
+		select {
+		case srv.waitSem <- struct{}{}:
+			defer func() { <-srv.waitSem }()
+		default:
+			writeError(w, http.StatusServiceUnavailable, "too many waiting clients")
+			return
+		}
+	}
 
 	var result *Result
 	var err error
