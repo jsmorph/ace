@@ -1383,6 +1383,61 @@ func TestHashPropertyDoesNotCountAgainstLimit(t *testing.T) {
 	}
 }
 
+func TestObjectArrayMatchViaSQLPath(t *testing.T) {
+	s := newTestSpace(t)
+	_, err := s.Out(json.RawMessage(`{"type":"task","tags":["urgent","backend"]}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	r, err := s.Rd(ctx, "", json.RawMessage(`{"tags":"urgent"}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil {
+		t.Fatal("expected match for array element via SQL path")
+	}
+
+	r, err = s.Rd(ctx, "", json.RawMessage(`{"tags":"frontend"}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		t.Fatal("expected no match for absent array element")
+	}
+}
+
+func TestObjectArrayMatchViaNotifyPath(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Blocking = BlockingNotify
+	s := newTestSpaceWithConfig(t, cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	done := make(chan *Result, 1)
+	go func() {
+		r, err := s.In(ctx, "", json.RawMessage(`{"tags":"backend"}`), 2*time.Second, "")
+		if err != nil {
+			t.Errorf("In: %v", err)
+		}
+		done <- r
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	_, err := s.Out(json.RawMessage(`{"type":"task","tags":["urgent","backend"]}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r := <-done
+	if r == nil {
+		t.Fatal("expected match for array element via notify path")
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }

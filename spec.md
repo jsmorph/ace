@@ -4,7 +4,7 @@ ACE is a coordination service for software agents, built on the tuple-space mode
 
 ## Objects
 
-An object is a JSON value of type "object" (a set of name-value pairs). Values may be strings, numbers, booleans, null, or nested objects. Object values may not be arrays. Properties whose names start with `#` are metadata: stored and returned but excluded from matching (see Metadata Properties).
+An object is a JSON value of type "object" (a set of name-value pairs). Values may be strings, numbers, booleans, null, nested objects, or arrays of atomic values (strings, numbers, booleans, null). Arrays may not contain objects or other arrays. Properties whose names start with `#` are metadata: stored and returned but excluded from matching (see Metadata Properties).
 
 ACE stores objects in canonical form: keys in lexicographic order, no HTML escaping. Two JSON objects that differ only in key order or whitespace produce the same canonical representation.
 
@@ -73,17 +73,21 @@ For every branch B with leaf L in the pattern:
   If L is an array [X1,...,Xn]: B with leaf Xi appears in the object for some i.
 ```
 
-An array in a pattern means "any of these values." Extra fields in the object do not prevent a match. The empty pattern `{}` matches every object.
+An array in a pattern means "any of these values." A single value is shorthand for a one-element array, so `{"a":1}` and `{"a":[1]}` are equivalent patterns. An array in an object generates one branch per element: `{"a":[1,2,3]}` produces branches `a=1`, `a=2`, and `a=3`. A pattern value matches if any element of the object array equals it. Extra fields in the object do not prevent a match. The empty pattern `{}` matches every object.
 
 | Pattern | Object | Match? |
 |---------|--------|--------|
 | `{"a":1}` | `{"a":1}` | yes |
+| `{"a":[1]}` | `{"a":1}` | yes |
 | `{"a":[1,2]}` | `{"a":1}` | yes |
 | `{"a":[1,2]}` | `{"a":3}` | no |
 | `{"a":[1,2]}` | `{"a":1,"b":0}` | yes |
 | `{"b":[1,2]}` | `{"a":1}` | no |
 | `{"b":[1,2]}` | `{"a":3,"b":1}` | yes |
 | `{"a":{"b":1,"c":2}}` | `{"a":{"b":1,"c":2,"d":3}}` | yes |
+| `{"a":2}` | `{"a":[1,2,3]}` | yes |
+| `{"a":4}` | `{"a":[1,2,3]}` | no |
+| `{"a":[2,4]}` | `{"a":[1,2,3]}` | yes |
 | `{"a":{"b":1,"c":2},"d":3}` | `{"a":{"b":1,"c":2,"d":3}}` | no |
 
 The last row fails because the pattern requires `"d":3` at the top level, but the object contains `"d":3` only inside `"a"`.
@@ -161,6 +165,7 @@ These limits constrain every operation. A violation produces an error that state
 | Property name size | 64 bytes |
 | Object value size | 128 bytes |
 | Object leaves | 8 |
+| Object array length | 4 |
 | Pattern size | 2048 bytes |
 | Pattern leaves | 4 |
 | Pattern array length | 4 |
@@ -170,4 +175,4 @@ These limits constrain every operation. A violation produces an error that state
 | TTL maximum | 7 days |
 | Caller ID size | 128 bytes |
 
-An object leaf is a scalar value at any nesting depth. A pattern leaf is a single constraint: a scalar is one leaf, and an array of alternatives is one leaf. Metadata properties (names starting with `#`) do not count as leaves.
+An object leaf is a scalar value at any nesting depth. Each element of an array in an object counts as one leaf: `{"a":[1,2,3]}` has three leaves. A pattern leaf is a single constraint: a scalar is one leaf, and an array of alternatives is one leaf. Metadata properties (names starting with `#`) do not count as leaves.

@@ -82,6 +82,36 @@ func TestMatchHashInPatternError(t *testing.T) {
 	}
 }
 
+func TestMatchObjectArray(t *testing.T) {
+	ok, err := Match(json.RawMessage(`{"a":[1,2,3]}`), json.RawMessage(`{"a":2}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected match: object array element should match atomic pattern")
+	}
+}
+
+func TestMatchObjectArrayPatternArray(t *testing.T) {
+	ok, err := Match(json.RawMessage(`{"a":[1,2,3]}`), json.RawMessage(`{"a":[2,4]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok {
+		t.Fatal("expected match: object array and pattern array should intersect")
+	}
+}
+
+func TestMatchObjectArrayNoMatch(t *testing.T) {
+	ok, err := Match(json.RawMessage(`{"a":[1,2,3]}`), json.RawMessage(`{"a":4}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ok {
+		t.Fatal("expected no match")
+	}
+}
+
 // Quamina supports operators like prefix, suffix, anything-but, numeric, and
 // exists. ACE does not expose these. Nested objects in patterns become
 // structural (path-based) matches, and objects inside pattern arrays are

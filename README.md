@@ -2,6 +2,14 @@
 
 ACE is a coordination service for software agents. It implements a tuple space: a shared, persistent store where agents communicate by writing and reading JSON objects. Agents coordinate through the objects themselves, matched by pattern, without knowing about each other. ACE is built with Go and SQLite and exposes an HTTP API and a CLI.
 
+## Background
+
+In 1985, David Gelernter introduced Linda, a coordination language for parallel programs. The central idea: processes communicate not by sending messages to each other but by writing tuples into a shared associative memory and retrieving them by pattern. Three operations define the model. `out` places a tuple in the space. `in` retrieves and removes a matching tuple, blocking if none exists. `rd` reads without removing. Because a producer does not name a recipient and a consumer does not name a source, the two are decoupled in both time and identity. A process can write a result and terminate; another process, started hours later, can retrieve it.
+
+Autonomous AI agents face the same coordination problem. An orchestrator decomposes work into tasks. Worker agents claim tasks, produce results, and may spawn further tasks. Monitors observe progress. The number and identity of agents can change at any time. Message queues and pub/sub systems handle some of these patterns, but they require the sender to choose a destination queue or topic. A tuple space lets agents coordinate through the content of the data: write a JSON object describing a task, and any agent whose pattern matches it can retrieve it. No routing configuration, no queue names, no broker topics.
+
+ACE adapts Gelernter's model for this setting, replacing tuples with JSON objects and adding access control, TTL, and an HTTP interface.
+
 ## Operations
 
 ACE provides four operations borrowed from the tuple-space tradition.
@@ -160,15 +168,9 @@ When explicit deletes are enabled (`--deletes`), `in` does not remove objects im
 
 The server accepts `--blocking` (`polling` or `notify`), `--scavenge` (expiration interval), `--max-waiters` (concurrent blocking client limit), and `--limits` (JSON file overriding default limits). The [CLI reference](cli-spec.md) documents all flags; the [specification](spec.md) lists limits and their defaults.
 
-## Background
+## Event pattern matching
 
-### Tuple spaces
-
-David Gelernter introduced tuple spaces in 1985 with Linda, a coordination language for parallel programs. The core idea: processes communicate not by sending messages to each other but by writing tuples into a shared associative memory and retrieving them by pattern. The three operations (`out`, `in`, `rd`) decouple producers from consumers in both time and space. ACE applies this model to agent coordination, replacing tuples with JSON objects and adding access control and TTL.
-
-### Event pattern matching
-
-AWS EventBridge routes events by matching their JSON content against patterns that specify required field values. Tim Bray's [Quamina](https://github.com/timbray/quamina) is an open-source implementation of that pattern-matching engine, optimized for large numbers of patterns evaluated against each incoming event. ACE uses Quamina to notify blocked clients: when a new object enters the space, Quamina identifies which waiting clients have patterns that match it, and those clients wake up to execute their queries. The notification approach avoids polling in the common case.
+AWS EventBridge routes events by matching their JSON content against patterns that specify required field values. Tim Bray's [Quamina](https://github.com/timbray/quamina) is an open-source implementation of that matching engine, optimized for large numbers of patterns evaluated against each incoming event. ACE uses Quamina to notify blocked clients: when a new object enters the space, Quamina identifies which waiting clients have patterns that match it, and those clients wake up to execute their queries.
 
 ## Specifications
 

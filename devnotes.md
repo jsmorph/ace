@@ -26,7 +26,7 @@ A branch is a root-to-leaf path in a JSON object, encoded as `path.to.prop=value
 
 Property name escaping: `.` `=` `\` are escaped with `\` prefix. String values are quoted with `"` and internal `"` and `\` are escaped. Numbers are normalized via `strconv.FormatFloat(v, 'f', -1, 64)`, which maps `1.0` and `1` to the same string `"1"`.
 
-Arrays are not valid in object values. They appear only in pattern leaves, where `[1,2]` means "match 1 or 2".
+Arrays in pattern leaves mean "match any of these values": `[1,2]` means "match 1 or 2". A single value is equivalent to a one-element array, so `{"a":1}` and `{"a":[1]}` produce identical pattern branches. Arrays in object values generate one branch per element: `{"a":[1,2,3]}` produces branches `a=1`, `a=2`, `a=3`. Array elements must be atomic (no nested objects or arrays). The `ObjectArrayLength` limit (default 4) caps array size, and each element counts as one leaf against `ObjectLeaves`.
 
 ## Pattern Matching via SQL
 
@@ -86,7 +86,7 @@ Quamina's `MatchesForEvent` receives the full object JSON (including `#` fields)
 
 ## Decisions
 
-**No arrays in object values.** The spec's branch model only defines matching for atomic leaves. An object with an array value (like `{"a":[1,2]}`) has no well-defined branch encoding. Validation rejects arrays in objects.
+**Arrays in object values.** An array of atomics in an object value produces one branch per element. `{"a":[1,2]}` generates branches `a=1` and `a=2`, so pattern `{"a":1}` and pattern `{"a":[2,3]}` both match. Quamina handles arrays in events natively (it matches if any element satisfies the pattern), so the notification path requires no special conversion.
 
 **Number normalization.** `float64` representation with `FormatFloat` normalizes `1` and `1.0` to the same branch string. This prevents subtle matching failures from JSON serialization differences.
 

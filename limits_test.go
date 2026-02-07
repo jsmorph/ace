@@ -45,11 +45,35 @@ func TestValidateObjectTooManyLeaves(t *testing.T) {
 	}
 }
 
-func TestValidateObjectArray(t *testing.T) {
+func TestValidateObjectArrayOK(t *testing.T) {
 	lim := DefaultLimits()
 	err := lim.ValidateObject([]byte(`{"a":[1,2]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestValidateObjectArrayTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.ObjectArrayLength = 2
+	err := lim.ValidateObject([]byte(`{"a":[1,2,3]}`))
 	if err == nil {
-		t.Fatal("expected error for array in object value")
+		t.Fatal("expected error for array exceeding ObjectArrayLength")
+	}
+	if !strings.Contains(err.Error(), "3 > 2 elements") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateObjectArrayLeafCount(t *testing.T) {
+	lim := DefaultLimits()
+	lim.ObjectLeaves = 2
+	err := lim.ValidateObject([]byte(`{"a":[1,2,3]}`))
+	if err == nil {
+		t.Fatal("expected error: 3-element array should count as 3 leaves")
+	}
+	if !strings.Contains(err.Error(), "3 > 2 leaves") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

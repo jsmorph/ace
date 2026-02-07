@@ -31,7 +31,20 @@ func extractFromObject(obj map[string]interface{}, path []string, out *[]string)
 				return err
 			}
 		case []interface{}:
-			return fmt.Errorf("arrays are not permitted in object values")
+			prefix := strings.Join(p, ".") + "="
+			for _, elem := range val {
+				if _, ok := elem.(map[string]interface{}); ok {
+					return fmt.Errorf("object array element cannot be an object")
+				}
+				if _, ok := elem.([]interface{}); ok {
+					return fmt.Errorf("object array element cannot be an array")
+				}
+				leaf, err := encodeLeaf(elem)
+				if err != nil {
+					return err
+				}
+				*out = append(*out, prefix+leaf)
+			}
 		default:
 			leaf, err := encodeLeaf(v)
 			if err != nil {

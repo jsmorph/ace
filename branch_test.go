@@ -81,10 +81,34 @@ func TestExtractBranchesStringEscaping(t *testing.T) {
 	}
 }
 
-func TestExtractBranchesRejectsArray(t *testing.T) {
-	_, err := ExtractBranches([]byte(`{"a":[1,2]}`))
+func TestExtractBranchesArray(t *testing.T) {
+	branches, err := ExtractBranches([]byte(`{"a":[1,2,3]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(branches)
+	want := []string{"a=1", "a=2", "a=3"}
+	if len(branches) != len(want) {
+		t.Fatalf("got %v, want %v", branches, want)
+	}
+	for i := range branches {
+		if branches[i] != want[i] {
+			t.Fatalf("got %v, want %v", branches, want)
+		}
+	}
+}
+
+func TestExtractBranchesArrayRejectsNestedObject(t *testing.T) {
+	_, err := ExtractBranches([]byte(`{"a":[{"b":1}]}`))
 	if err == nil {
-		t.Fatal("expected error for array value")
+		t.Fatal("expected error for nested object in array")
+	}
+}
+
+func TestExtractBranchesArrayRejectsNestedArray(t *testing.T) {
+	_, err := ExtractBranches([]byte(`{"a":[[1]]}`))
+	if err == nil {
+		t.Fatal("expected error for nested array in array")
 	}
 }
 

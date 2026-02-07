@@ -12,6 +12,7 @@ type Limits struct {
 	PropertySize        int           `json:"property_size"`
 	ObjectValueSize     int           `json:"object_value_size"`
 	ObjectLeaves        int           `json:"object_leaves"`
+	ObjectArrayLength   int           `json:"object_array_length"`
 	PatternSize         int           `json:"pattern_size"`
 	PatternLeaves       int           `json:"pattern_leaves"`
 	PatternArrayLength  int           `json:"pattern_array_length"`
@@ -28,6 +29,7 @@ func DefaultLimits() Limits {
 		PropertySize:        64,
 		ObjectValueSize:     128,
 		ObjectLeaves:        8,
+		ObjectArrayLength:   4,
 		PatternSize:         2048,
 		PatternLeaves:       4,
 		PatternArrayLength:  4,
@@ -78,7 +80,25 @@ func (l Limits) walkObject(obj map[string]interface{}, path string) (int, error)
 			}
 			leaves += n
 		case []interface{}:
-			return 0, fmt.Errorf("arrays are not permitted in object values (at %q)", fullPath)
+			if len(val) > l.ObjectArrayLength {
+				return 0, fmt.Errorf("object array at %q has %d > %d elements", fullPath, len(val), l.ObjectArrayLength)
+			}
+			for i, elem := range val {
+				if _, ok := elem.(map[string]interface{}); ok {
+					return 0, fmt.Errorf("object array at %q[%d] contains an object", fullPath, i)
+				}
+				if _, ok := elem.([]interface{}); ok {
+					return 0, fmt.Errorf("object array at %q[%d] contains an array", fullPath, i)
+				}
+				ser, err := json.Marshal(elem)
+				if err != nil {
+					return 0, fmt.Errorf("cannot serialize value at %q[%d]: %w", fullPath, i, err)
+				}
+				if len(ser) > l.ObjectValueSize {
+					return 0, fmt.Errorf("value at %q[%d] is %d > %d bytes", fullPath, i, len(ser), l.ObjectValueSize)
+				}
+			}
+			leaves += len(val)
 		default:
 			ser, err := json.Marshal(v)
 			if err != nil {
