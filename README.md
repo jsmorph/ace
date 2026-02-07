@@ -1,16 +1,18 @@
 # ACE: Agent Coordination Engine
 
-ACE is a coordination service for software agents. It implements a tuple space: a shared, persistent store where agents communicate by writing and reading JSON objects. Agents coordinate through the objects themselves, matched by pattern, without knowing about each other. The implementation uses Go, SQLite, and an HTTP API.
+ACE is a coordination service for software agents. It implements a tuple space: a shared, persistent store where agents communicate by writing and reading JSON objects. Agents coordinate through the objects themselves, matched by pattern, without knowing about each other. ACE is built with Go and SQLite and exposes an HTTP API and a CLI.
 
 ## Operations
 
-ACE provides three operations borrowed from the tuple-space tradition.
+ACE provides four operations borrowed from the tuple-space tradition.
 
 `out(object, access, ttl)` writes an object into the space.
 
 `in(pattern, wait, since)` finds and removes the earliest object matching the pattern. If no match exists and `wait` is greater than zero, the call blocks for up to that many seconds. The optional `since` parameter skips objects with timestamps at or before the given value, enabling cursor-style iteration.
 
 `rd(pattern, wait, since)` works like `in` but does not remove the object.
+
+`del(delete_id)` permanently deletes an object previously marked invisible by `in` when explicit deletes are enabled (see Explicit Deletes below).
 
 Each object receives a unique nanosecond-resolution timestamp as its identifier. Operations return the earliest matching object first.
 
@@ -38,6 +40,10 @@ An array in a pattern means "any of these values." Extra fields in the object do
 | `{"a":{"b":1,"c":2},"d":3}` | `{"a":{"b":1,"c":2,"d":3}}` | no     |
 
 The last row fails because `"d":3` must appear at the top level of the object, but it appears only inside `"a"`.
+
+## Metadata properties
+
+Properties whose names start with `#` are metadata: stored in the object and returned to callers, but excluded from pattern matching. They do not count against the object leaf limit. A `#` property in a pattern is an error. See the [specification](spec.md) for details.
 
 ## Usage
 
@@ -87,16 +93,23 @@ curl -X POST http://localhost:8000/in \
   -d '{"pattern":{"type":"task"},"wait":10}'
 ```
 
-The CLI operates directly on the database without the HTTP server:
+Test whether an object matches a pattern (no database required):
+
+```
+ace match --object '{"type":"task","priority":1}' --pattern '{"type":"task"}'
+```
+
+The remaining CLI commands operate directly on the database without the HTTP server:
 
 ```
 ace out --object '{"type":"task","payload":"compute"}'
 ace rd --pattern '{"type":"task"}'
 ace in --pattern '{"type":"task"}'
+ace del --delete-id <id>
 ace stats
 ```
 
-Run the built-in stress test, which launches concurrent writers and readers over HTTP and verifies that readers consume every written object exactly once:
+The built-in stress test launches concurrent writers and readers over HTTP and verifies that every written object is consumed exactly once:
 
 ```
 ace test --writers 8 --readers 8 --requests 200
@@ -109,10 +122,12 @@ ace test --writers 8 --readers 8 --requests 200
 | POST | `/out` | Write an object |
 | POST | `/in` | Read and remove a matching object |
 | POST | `/rd` | Read a matching object |
+| POST/GET | `/match` | Test whether an object matches a pattern |
+| POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return active limits |
 | GET | `/stats` | Return storage statistics |
 
-See `http-spec.md` for request/response formats and error codes.
+See the [HTTP API specification](http-spec.md) for request/response formats and error codes.
 
 ## Access control
 
@@ -137,9 +152,13 @@ If an object has no `access` parameter, any caller can read or consume it regard
 
 The optional `ttl` parameter on `out` sets the object's lifetime as an ISO 8601 duration (e.g., `P3D` for three days, `PT2H` for two hours). The default is 72 hours. Expired objects become invisible to `in` and `rd`.
 
+## Explicit deletes
+
+When explicit deletes are enabled (`--deletes`), `in` does not remove objects immediately. Instead it marks the object invisible and returns a `delete_id`. The caller confirms deletion by calling `del` with that ID within the visibility timeout (default: 30 seconds). If confirmation does not arrive in time, the object reappears in the space. See the [specification](spec.md) for details.
+
 ## Configuration
 
-See `cli-spec.md` for the full set of flags. The server accepts `--blocking` (`polling` or `notify`), `--scavenge` (expiration interval), `--max-waiters` (concurrent blocking client limit), and `--limits` (JSON file overriding default limits). See `spec.md` for the list of limits and their defaults.
+The server accepts `--blocking` (`polling` or `notify`), `--scavenge` (expiration interval), `--max-waiters` (concurrent blocking client limit), and `--limits` (JSON file overriding default limits). The [CLI reference](cli-spec.md) documents all flags; the [specification](spec.md) lists limits and their defaults.
 
 ## Background
 
@@ -151,19 +170,15 @@ David Gelernter introduced tuple spaces in 1985 with Linda, a coordination langu
 
 AWS EventBridge routes events by matching their JSON content against patterns that specify required field values. Tim Bray's [Quamina](https://github.com/timbray/quamina) is an open-source implementation of that pattern-matching engine, optimized for large numbers of patterns evaluated against each incoming event. ACE uses Quamina to notify blocked clients: when a new object enters the space, Quamina identifies which waiting clients have patterns that match it, and those clients wake up to execute their queries. The notification approach avoids polling in the common case.
 
-### Norvig's pattern matcher
-
-Peter Norvig's `patmatch` (from *Paradigms of Artificial Intelligence Programming*, 1992) showed that a small pattern language with a few composable operations (literal match, variables, segment variables) expresses non-trivial matching concisely. ACE's pattern language is far simpler: no unification, no variables, no backtracking. But it follows the same principle that matching against structure is more natural and more composable than matching against serialized strings.
-
 ## Specifications
 
 Three specification files document the details:
 
 | Document | Scope |
 |----------|-------|
-| `spec.md` | Core operations, pattern matching, access control, TTL, blocking, limits |
-| `http-spec.md` | HTTP API endpoints, request/response formats, error codes |
-| `cli-spec.md` | CLI subcommands, flags, stdin behavior |
+| [Specification](spec.md) | Core operations, pattern matching, access control, TTL, blocking, limits |
+| [HTTP API](http-spec.md) | Endpoints, request/response formats, error codes |
+| [CLI reference](cli-spec.md) | Subcommands, flags, stdin behavior |
 
 ## Dependencies
 
@@ -171,8 +186,5 @@ ACE has two external dependencies. [modernc.org/sqlite](https://pkg.go.dev/moder
 
 ## References
 
-- [Quamina](https://github.com/timbray/quamina): Content-based pattern matching for JSON events. Tim Bray's open-source implementation of the approach used by AWS EventBridge.
-- [Quamina API documentation](https://pkg.go.dev/quamina.net/go/quamina)
-- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite): Pure-Go SQLite implementation.
-- David Gelernter, [Generative Communication in Linda](https://dl.acm.org/doi/10.1145/2363.2433), ACM TOPLAS, 1985. The original tuple-space paper.
-- Peter Norvig, *Paradigms of Artificial Intelligence Programming*, 1992. Chapter 6 describes `patmatch`.
+1. David Gelernter, [Generative Communication in Linda](https://dl.acm.org/doi/10.1145/2363.2433), ACM TOPLAS, 1985. The original tuple-space paper.
+1. [Quamina](https://github.com/timbray/quamina): Content-based pattern matching for JSON events. Tim Bray's open-source implementation of the approach used by AWS EventBridge.

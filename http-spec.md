@@ -9,6 +9,7 @@ This document specifies the HTTP interface to ACE. See `spec.md` for the core op
 | POST | `/out` | Write an object |
 | POST | `/in` | Read and remove a matching object |
 | POST | `/rd` | Read a matching object |
+| POST/GET | `/match` | Test whether an object matches a pattern |
 | POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return the active limits |
 | GET | `/stats` | Return storage statistics |
@@ -84,6 +85,33 @@ null
 ## POST /rd
 
 `/rd` uses the same request and response format as `/in`. The object remains in the space.
+
+## POST/GET /match
+
+Test whether an object matches a pattern. This operation does not read from or write to the space.
+
+POST request body:
+
+```json
+{"object": {"type": "task", "priority": 1}, "pattern": {"type": "task"}}
+```
+
+GET request: pass `object` and `pattern` as query parameters containing URL-encoded JSON.
+
+```
+GET /match?object=%7B%22type%22%3A%22task%22%7D&pattern=%7B%22type%22%3A%22task%22%7D
+```
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `object` | yes | JSON object |
+| `pattern` | yes | JSON pattern (see `spec.md`) |
+
+Response (200):
+
+```json
+{"match": true}
+```
 
 ## POST/GET /del
 

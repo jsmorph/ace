@@ -23,6 +23,7 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	mux.HandleFunc("/in", srv.handleIn)
 	mux.HandleFunc("/rd", srv.handleRd)
 	mux.HandleFunc("/del", srv.handleDel)
+	mux.HandleFunc("/match", srv.handleMatchTest)
 	mux.HandleFunc("/limits", srv.handleLimits)
 	mux.HandleFunc("/stats", srv.handleStats)
 	srv.mux = mux
@@ -202,6 +203,56 @@ func (srv *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)
+}
+
+type matchTestRequest struct {
+	Object  json.RawMessage `json:"object"`
+	Pattern json.RawMessage `json:"pattern"`
+}
+
+type matchTestResponse struct {
+	Match bool `json:"match"`
+}
+
+func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
+	var req matchTestRequest
+
+	switch r.Method {
+	case http.MethodGet:
+		obj := r.URL.Query().Get("object")
+		pat := r.URL.Query().Get("pattern")
+		if obj != "" {
+			req.Object = json.RawMessage(obj)
+		}
+		if pat != "" {
+			req.Pattern = json.RawMessage(pat)
+		}
+	case http.MethodPost:
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "GET or POST required")
+		return
+	}
+
+	if req.Object == nil {
+		writeError(w, http.StatusBadRequest, "object is required")
+		return
+	}
+	if req.Pattern == nil {
+		writeError(w, http.StatusBadRequest, "pattern is required")
+		return
+	}
+
+	ok, err := Match(req.Object, req.Pattern)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, matchTestResponse{Match: ok})
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) {

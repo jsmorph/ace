@@ -524,6 +524,106 @@ func TestServerDelMethodNotAllowed(t *testing.T) {
 	}
 }
 
+func TestServerMatchTest(t *testing.T) {
+	srv := newTestServer(t)
+
+	body := `{"object":{"a":1},"pattern":{"a":1}}`
+	req := httptest.NewRequest("POST", "/match", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp matchTestResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Match {
+		t.Fatal("expected match=true")
+	}
+}
+
+func TestServerMatchTestNoMatch(t *testing.T) {
+	srv := newTestServer(t)
+
+	body := `{"object":{"a":1},"pattern":{"a":2}}`
+	req := httptest.NewRequest("POST", "/match", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp matchTestResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Match {
+		t.Fatal("expected match=false")
+	}
+}
+
+func TestServerMatchTestGet(t *testing.T) {
+	srv := newTestServer(t)
+
+	req := httptest.NewRequest("GET", "/match?object=%7B%22a%22%3A1%7D&pattern=%7B%22a%22%3A1%7D", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp matchTestResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if !resp.Match {
+		t.Fatal("expected match=true via GET")
+	}
+}
+
+func TestServerMatchTestMissingFields(t *testing.T) {
+	srv := newTestServer(t)
+
+	// POST: missing pattern
+	body := `{"object":{"a":1}}`
+	req := httptest.NewRequest("POST", "/match", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for missing pattern, got %d", w.Code)
+	}
+
+	// POST: missing object
+	body = `{"pattern":{"a":1}}`
+	req = httptest.NewRequest("POST", "/match", bytes.NewBufferString(body))
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for missing object, got %d", w.Code)
+	}
+
+	// GET: missing both
+	req = httptest.NewRequest("GET", "/match", nil)
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400 for GET with no params, got %d", w.Code)
+	}
+}
+
+func TestServerMatchTestMethodNotAllowed(t *testing.T) {
+	srv := newTestServer(t)
+
+	req := httptest.NewRequest("PUT", "/match", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 405 {
+		t.Fatalf("expected 405, got %d", w.Code)
+	}
+}
+
 func TestServerDelMissingID(t *testing.T) {
 	ts := newTestServerDeletes(t)
 

@@ -268,7 +268,10 @@ All subcommands also accept `--db FILENAME`, which defaults to
       `stderr`): `WARN high latency ACTUAL_DURATION for
       SHORT_DESCRIPTION_OF_OP`. Note that high latency is *not* an
       error.
-	  
+
+- [ ] Add new `/match` and `ace match` APIs that simply take an object
+      and pattern and return whether the object matches the pattern.
+
 ## Roadmap
 
  For later. Do *not* pursue now.

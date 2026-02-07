@@ -54,6 +54,21 @@ If `--pattern` is absent or `-`, the command reads the pattern from stdin. Outpu
 
 `ace rd` uses the same flags as `ace in`. The object remains in the space.
 
+## ace match
+
+Test whether an object matches a pattern. This command does not open a database.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--object` | (required) | JSON object |
+| `--pattern` | (required) | JSON pattern |
+
+Output:
+
+```json
+{"match": true}
+```
+
 ## ace del
 
 Confirm deletion of an object previously returned by `ace in --deletes`. See `spec.md` for the explicit deletes mechanism.
