@@ -7,6 +7,21 @@ import (
 	"time"
 )
 
+// ValidationError indicates a client-supplied value violates a constraint.
+type ValidationError struct {
+	Err error
+}
+
+func (e *ValidationError) Error() string { return e.Err.Error() }
+func (e *ValidationError) Unwrap() error { return e.Err }
+
+func validationErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &ValidationError{Err: err}
+}
+
 // Limits constrains object, pattern, access, and TTL parameters.
 type Limits struct {
 	ObjectSize          int           `json:"object_size"`
@@ -206,6 +221,9 @@ func (l Limits) ValidateAccess(raw []byte) error {
 		return fmt.Errorf("access has %d > %d identifiers", total, l.AccessLength)
 	}
 	for _, id := range acc.In {
+		if id == "" {
+			return fmt.Errorf("access identity must not be empty")
+		}
 		if id == "!" {
 			return fmt.Errorf("access in ID %q is reserved", id)
 		}
@@ -214,6 +232,9 @@ func (l Limits) ValidateAccess(raw []byte) error {
 		}
 	}
 	for _, id := range acc.Rd {
+		if id == "" {
+			return fmt.Errorf("access identity must not be empty")
+		}
 		if id == "!" {
 			return fmt.Errorf("access rd ID %q is reserved", id)
 		}

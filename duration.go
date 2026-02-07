@@ -2,6 +2,7 @@ package ace
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -58,6 +59,26 @@ func ParseISO8601Duration(s string) (time.Duration, error) {
 	return d, nil
 }
 
+// ParseWait parses a wait duration from a string. It accepts three formats:
+// ISO 8601 durations (e.g. "PT10S"), Go durations (e.g. "10s"), and bare
+// integers interpreted as seconds (e.g. "10").
+func ParseWait(s string) (time.Duration, error) {
+	if s == "" {
+		return 0, fmt.Errorf("empty wait value")
+	}
+	if d, err := ParseISO8601Duration(s); err == nil {
+		return d, nil
+	}
+	if d, err := time.ParseDuration(s); err == nil {
+		return d, nil
+	}
+	n, rest, err := parseLeadingInt(s)
+	if err == nil && rest == "" {
+		return time.Duration(n) * time.Second, nil
+	}
+	return 0, fmt.Errorf("invalid wait %q: expected ISO 8601 duration, Go duration, or integer seconds", s)
+}
+
 func parseLeadingInt(s string) (int64, string, error) {
 	i := 0
 	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
@@ -68,6 +89,9 @@ func parseLeadingInt(s string) (int64, string, error) {
 	}
 	var n int64
 	for _, c := range s[:i] {
+		if n > (math.MaxInt64-9)/10 {
+			return 0, s, fmt.Errorf("number too large")
+		}
 		n = n*10 + int64(c-'0')
 	}
 	return n, s[i:], nil

@@ -50,15 +50,15 @@ tradition.
 
 `out(object, access, ttl)` writes an object into the space.
 
-`in(pattern, wait, since)` finds and removes the earliest
-object matching the pattern. If no match exists and `wait` is
-greater than zero, the call blocks for up to that many
-seconds. The optional `since` parameter skips objects with
-timestamps at or before the given value, enabling
+`in(callerID, pattern, wait, since)` finds and removes the
+earliest object matching the pattern. If no match exists and
+`wait` is greater than zero, the call blocks for up to that
+duration. The optional `since` parameter skips objects
+with timestamps at or before the given value, enabling
 cursor-style iteration.
 
-`rd(pattern, wait, since)` works like `in` but does not
-remove the object.
+`rd(callerID, pattern, wait, since)` works like `in` but
+does not remove the object.
 
 `del(delete_id)` permanently deletes an object previously
 marked invisible by `in` when explicit deletes are enabled
@@ -151,7 +151,7 @@ Block until a match appears (up to 10 seconds):
 
 ```
 curl -X POST http://localhost:8000/in \
-  -d '{"pattern":{"type":"task"},"wait":10}'
+  -d '{"pattern":{"type":"task"},"wait":"10s"}'
 ```
 
 Test whether an object matches a pattern (no database

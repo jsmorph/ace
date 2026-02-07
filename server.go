@@ -2,6 +2,7 @@ package ace
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -54,7 +55,7 @@ type outResponse struct {
 
 type matchRequest struct {
 	Pattern json.RawMessage `json:"pattern"`
-	Wait    float64         `json:"wait,omitempty"`
+	Wait    json.RawMessage `json:"wait,omitempty"`
 	Since   string          `json:"since,omitempty"`
 }
 
@@ -87,7 +88,7 @@ func (srv *Server) handleOut(w http.ResponseWriter, r *http.Request) {
 
 	id, err := srv.space.Out(req.Object, req.Access, ttl)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, httpStatusForError(err), err.Error())
 		return
 	}
 
@@ -121,7 +122,11 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 		return
 	}
 
-	wait := time.Duration(req.Wait * float64(time.Second))
+	wait, err := parseWaitField(req.Wait)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid wait: "+err.Error())
+		return
+	}
 
 	if wait > 0 && srv.waitSem != nil {
 		select {
@@ -134,14 +139,13 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 	}
 
 	var result *Result
-	var err error
 	if remove {
 		result, err = srv.space.In(r.Context(), callerID, req.Pattern, wait, req.Since)
 	} else {
 		result, err = srv.space.Rd(r.Context(), callerID, req.Pattern, wait, req.Since)
 	}
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		writeError(w, httpStatusForError(err), err.Error())
 		return
 	}
 
@@ -263,12 +267,10 @@ func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, matchTestResponse{Match: ok})
 }
 
-func writeJSON(w http.ResponseWriter, code int, v interface{}) {
+func writeJSON(w http.ResponseWriter, code int, v interface{}) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		log.Printf("writeJSON: %v", err)
-	}
+	return json.NewEncoder(w).Encode(v)
 }
 
 type errorResponse struct {
@@ -276,7 +278,37 @@ type errorResponse struct {
 }
 
 func writeError(w http.ResponseWriter, code int, msg string) {
-	writeJSON(w, code, errorResponse{Error: msg})
+	if err := writeJSON(w, code, errorResponse{Error: msg}); err != nil {
+		log.Printf("writeError: %v", err)
+	}
+}
+
+// parseWaitField parses the "wait" field from a JSON request. It accepts a
+// JSON number (seconds), a JSON string (ISO 8601, Go duration, or bare integer
+// seconds), or null/absent (zero).
+func parseWaitField(raw json.RawMessage) (time.Duration, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, nil
+	}
+	// Try as number (seconds).
+	var n float64
+	if err := json.Unmarshal(raw, &n); err == nil {
+		return time.Duration(n * float64(time.Second)), nil
+	}
+	// Try as string.
+	var s string
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return 0, fmt.Errorf("expected number or duration string")
+	}
+	return ParseWait(s)
+}
+
+func httpStatusForError(err error) int {
+	var ve *ValidationError
+	if errors.As(err, &ve) {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
 
 const docSummary = "ACE is a coordination service for software agents based on the tuple-space model."

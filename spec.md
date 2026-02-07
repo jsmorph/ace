@@ -67,7 +67,7 @@ earliest matching object.
 |-----------|----------|---------|---------|
 | `callerID` | no | empty | Caller identity for access control |
 | `pattern` | yes | | JSON pattern |
-| `wait` | no | 0 | Maximum seconds to block |
+| `wait` | no | 0 | Maximum time to block (integer seconds, ISO 8601, or Go duration) |
 | `since` | no | empty | Only objects after this identifier |
 
 If a matching object exists, `in` removes it from the space

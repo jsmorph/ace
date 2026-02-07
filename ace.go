@@ -104,29 +104,29 @@ func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (
 
 	canonical, err := canonicalize(object)
 	if err != nil {
-		return "", fmt.Errorf("canonicalize: %w", err)
+		return "", validationErr(fmt.Errorf("canonicalize: %w", err))
 	}
 	object = canonical
 
 	if err := s.cfg.Limits.ValidateTTL(ttl); err != nil {
-		return "", err
+		return "", validationErr(err)
 	}
 	if err := s.cfg.Limits.ValidateObject(object); err != nil {
-		return "", err
+		return "", validationErr(err)
 	}
 	if access != nil {
 		raw, err := json.Marshal(access)
 		if err != nil {
-			return "", fmt.Errorf("marshal access: %w", err)
+			return "", validationErr(fmt.Errorf("marshal access: %w", err))
 		}
 		if err := s.cfg.Limits.ValidateAccess(raw); err != nil {
-			return "", err
+			return "", validationErr(err)
 		}
 	}
 
 	branches, err := ExtractBranches(object)
 	if err != nil {
-		return "", fmt.Errorf("extract branches: %w", err)
+		return "", validationErr(fmt.Errorf("extract branches: %w", err))
 	}
 
 	id := s.idgen.Next()
@@ -202,15 +202,15 @@ func (s *Space) Rd(ctx context.Context, callerID string, pattern json.RawMessage
 
 func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string, accessType string, remove bool) (*Result, error) {
 	if err := s.cfg.Limits.ValidatePattern(pattern); err != nil {
-		return nil, err
+		return nil, validationErr(err)
 	}
 	if err := s.cfg.Limits.ValidateCallerID(callerID); err != nil {
-		return nil, err
+		return nil, validationErr(err)
 	}
 
 	pbs, err := ExtractPatternBranches(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("extract pattern branches: %w", err)
+		return nil, validationErr(fmt.Errorf("extract pattern branches: %w", err))
 	}
 
 	queryFn := func() (*Result, error) {
@@ -415,6 +415,9 @@ func canonicalize(raw json.RawMessage) (json.RawMessage, error) {
 	var obj map[string]interface{}
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return nil, err
+	}
+	if obj == nil {
+		return nil, fmt.Errorf("object must be a JSON object, not null")
 	}
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)

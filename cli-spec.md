@@ -62,7 +62,7 @@ Find and remove the earliest matching object.
 | `--pattern` | (stdin) | JSON pattern |
 | `--since` | (none) | Only objects after this identifier |
 | `--id` | (none) | Caller identity for access control |
-| `--wait` | (none) | Block duration (ISO 8601 or Go duration) |
+| `--wait` | (none) | Block duration (integer seconds, ISO 8601, or Go duration) |
 | `--deletes` | false | Enable explicit deletes |
 
 If `--pattern` is absent or `-`, the command reads the

@@ -67,7 +67,7 @@ Request body:
 | Field | Required | Purpose |
 |-------|----------|---------|
 | `pattern` | yes | JSON pattern (see `spec.md`) |
-| `wait` | no | Maximum seconds to block (default: 0) |
+| `wait` | no | Maximum time to block: integer seconds, ISO 8601 duration string (e.g. `"PT10S"`), or Go duration string (e.g. `"10s"`). Default: 0. |
 | `since` | no | Only objects after this identifier |
 
 Response when a match exists (200):

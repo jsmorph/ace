@@ -1553,6 +1553,79 @@ func TestObjectArrayMatchViaNotifyPath(t *testing.T) {
 	}
 }
 
+func TestNullObjectRejected(t *testing.T) {
+	s := newTestSpace(t)
+	_, err := s.Out(json.RawMessage("null"), nil, 0)
+	if err == nil {
+		t.Fatal("expected error for null object")
+	}
+}
+
+func TestEmptyAccessIdentityRejected(t *testing.T) {
+	limits := DefaultLimits()
+
+	raw := []byte(`{"in":[""]}`)
+	if err := limits.ValidateAccess(raw); err == nil {
+		t.Fatal("expected error for empty access identity in 'in' list")
+	}
+
+	raw = []byte(`{"rd":[""]}`)
+	if err := limits.ValidateAccess(raw); err == nil {
+		t.Fatal("expected error for empty access identity in 'rd' list")
+	}
+}
+
+func TestPatternMatchingSpecObjectArrays(t *testing.T) {
+	cases := []struct {
+		pattern string
+		object  string
+		matches bool
+	}{
+		{`{"a":[1]}`, `{"a":1}`, true},
+		{`{"a":2}`, `{"a":[1,2,3]}`, true},
+		{`{"a":4}`, `{"a":[1,2,3]}`, false},
+		{`{"a":[2,4]}`, `{"a":[1,2,3]}`, true},
+	}
+
+	for i, c := range cases {
+		s := newTestSpace(t)
+		ctx := context.Background()
+
+		_, err := s.Out(json.RawMessage(c.object), nil, 0)
+		if err != nil {
+			t.Fatalf("case %d: out: %v", i, err)
+		}
+
+		r, err := s.Rd(ctx, "anyone", json.RawMessage(c.pattern), 0, "")
+		if err != nil {
+			t.Fatalf("case %d: rd: %v", i, err)
+		}
+
+		got := r != nil
+		if got != c.matches {
+			t.Errorf("case %d: pattern=%s object=%s: got match=%v, want %v", i, c.pattern, c.object, got, c.matches)
+		}
+	}
+}
+
+func TestEmptyPatternArray(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	_, err := s.Out(json.RawMessage(`{"a":1}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := s.Rd(ctx, "", json.RawMessage(`{"a":[]}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		t.Fatal("empty array pattern should never match")
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }

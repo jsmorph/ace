@@ -637,3 +637,74 @@ func TestServerDelMissingID(t *testing.T) {
 		t.Fatalf("expected 400 for missing delete_id, got %d", resp.StatusCode)
 	}
 }
+
+func TestServerStats(t *testing.T) {
+	srv := newTestServer(t)
+
+	outBody := `{"object":{"a":1}}`
+	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(outBody))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("out: expected 200, got %d", w.Code)
+	}
+
+	req = httptest.NewRequest("GET", "/stats", nil)
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("stats: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var stats Stats
+	if err := json.NewDecoder(w.Body).Decode(&stats); err != nil {
+		t.Fatal(err)
+	}
+	if stats.Objects != 1 {
+		t.Fatalf("expected 1 object, got %d", stats.Objects)
+	}
+	if stats.Branches != 1 {
+		t.Fatalf("expected 1 branch, got %d", stats.Branches)
+	}
+}
+
+func TestServerWaitStringFormats(t *testing.T) {
+	srv := newTestServer(t)
+
+	// Write an object so rd returns immediately.
+	outBody := `{"object":{"a":1}}`
+	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(outBody))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("out: expected 200, got %d", w.Code)
+	}
+
+	formats := []string{
+		`{"pattern":{"a":1},"wait":10}`,
+		`{"pattern":{"a":1},"wait":"10"}`,
+		`{"pattern":{"a":1},"wait":"10s"}`,
+		`{"pattern":{"a":1},"wait":"PT10S"}`,
+	}
+	for _, body := range formats {
+		req = httptest.NewRequest("POST", "/rd", bytes.NewBufferString(body))
+		w = httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("rd with %s: expected 200, got %d: %s", body, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestServerWaitInvalidString(t *testing.T) {
+	srv := newTestServer(t)
+
+	body := `{"pattern":{"a":1},"wait":"bogus"}`
+	req := httptest.NewRequest("POST", "/rd", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
