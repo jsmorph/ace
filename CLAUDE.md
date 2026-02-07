@@ -2,53 +2,58 @@
 
 ## Core Principles
 
-You are writing for an expert with no tolerance for bullshit, junk
-language, guessing, fashion, or anything other that the highest
-quality technical work.  No adolescent crap.  No selling.
+You are writing for an expert with no tolerance for bullshit,
+junk language, guessing, fashion, or anything other that the
+highest quality technical work.  No adolescent crap.  No
+selling.
 
-When you are writing docs, use modest in-line markup (for emphasis,
-etc).  Do not use a hyphen when you should use a colon.  You should
-probably never use hyphens.  Do not go crazy with sub-sub-sub heading.
-Consider using tables instead of a lot of (say) level 5 subheadings.
-Don't over-use lists.  Our audience can read complete paragraphs (and
-often likes to do that).
+When you are writing docs, use modest in-line markup (for
+emphasis, etc).  Do not use a hyphen when you should use a
+colon.  You should probably never use hyphens.  Do not go
+crazy with sub-sub-sub heading.  Consider using tables
+instead of a lot of (say) level 5 subheadings.  Don't
+over-use lists.  Our audience can read complete paragraphs
+(and often likes to do that).
 
-Use complete sentences and correct grammar.  No split infinitives,
-vague references, slang, garbage style like "leverage" or "journey",
-or any hipster crap.  You are not selling, pitching, or persuading.
-Avoid passive voice but don't go to extremes.  Every word should be
-meaningful.  Remove those that aren't.  Silted, contrived, and/or
-pretentious transitions are bad.  Avoid jargon or fancy terms (unless
-genuinely accurate and helpful).
+Use complete sentences and correct grammar.  No split
+infinitives, vague references, slang, garbage style like
+"leverage" or "journey", or any hipster crap.  You are not
+selling, pitching, or persuading.  Avoid passive voice but
+don't go to extremes.  Every word should be meaningful.
+Remove those that aren't.  Silted, contrived, and/or
+pretentious transitions are bad.  Avoid jargon or fancy terms
+(unless genuinely accurate and helpful).
 
-When writing documents, you should edit yourself like a serious author
-with an old-school editor at The New Yorker.  Think like John McPhee
-perhaps.
+When writing documents, you should edit yourself like a
+serious author with an old-school editor at The New Yorker.
+Think like John McPhee perhaps.
 
 Use the Oxford comma obviously.
 
-**Absolutely no gratuitous or obvious comments in code or elsewhere.**
+**Absolutely no gratuitous or obvious comments in code or
+elsewhere.**
 
-Keep things as simple as possible.  Simplicity and clarify are the
-greatest virtues.  Minimize third-party dependencies.  Ask for
-approval for any introduced dependency.  You better have a good
-reason.
+Keep things as simple as possible.  Simplicity and clarify
+are the greatest virtues.  Minimize third-party dependencies.
+Ask for approval for any introduced dependency.  You better
+have a good reason.
 
-Do not be lazy.  When you encounter a problem, work on it directly.
-Do not rush to some hack or work-around.  Instead of guessing, search
-for and use **authoritative documentation**.  When you encounter
-adversity, think.
+Do not be lazy.  When you encounter a problem, work on it
+directly.  Do not rush to some hack or work-around.  Instead
+of guessing, search for and use **authoritative
+documentation**.  When you encounter adversity, think.
 
 Keep all interesting development notes, including links to
-authoritative documentation, in a file called `devnotes.md`, which you
-update as you go.  This document should be an organized, thoughtful
-journal.  Include clear links to authoritative docs as you need them.
-You can include small plans with checkboxes.  Be sure to include
-background discussion, rationales, and other explanations for
-important decisions.
+authoritative documentation, in a file called `devnotes.md`,
+which you update as you go.  This document should be an
+organized, thoughtful journal.  Include clear links to
+authoritative docs as you need them.  You can include small
+plans with checkboxes.  Be sure to include background
+discussion, rationales, and other explanations for important
+decisions.
 
-Do not use colors in console output.  Do not use elipsis in logging or
-other messages.
+Do not use colors in console output.  Do not use elipsis in
+logging or other messages.
 
 Do no swallow any errors. Simply logging an error counts as
 "swallowing".
@@ -61,26 +66,37 @@ When in doubt about how to draft something, *ask*.
 
 ## Document Structure
 
-**Headings**: Avoid deep hierarchies (no sub-sub-sub-headings). Two or three levels suffice for most documents.
+**Headings**: Avoid deep hierarchies (no
+sub-sub-sub-headings). Two or three levels suffice for most
+documents.
 
-**Tables vs. lists**: When you have many parallel items with attributes, consider using a table instead of alist. Don't create five level-4 subheadings when a table would be clearer.
+**Tables vs. lists**: When you have many parallel items with
+attributes, consider using a table instead of a list. Don't
+create five level-4 subheadings when a table would be
+clearer.
 
-**Lists vs. paragraphs**: Don't overuse lists. The audience can read complete paragraphs and often prefers them. Use lists for genuinely enumerable items, not as a substitute for prose. Favor real paragraphs over listicle-like bullshit.
+**Lists vs. paragraphs**: Don't overuse lists. The audience
+can read complete paragraphs and often prefers them. Use
+lists for genuinely enumerable items, not as a substitute for
+prose. Favor real paragraphs over listicle-like bullshit.
 
-**Markup**: Use modest inline markup for emphasis. Use colons, not hyphens, to introduce explanatory clauses.
+**Markup**: Use modest inline markup for emphasis. Use
+colons, not hyphens, to introduce explanatory clauses.
 
 ## No junk language
 
-Cut sentences that announce what follows rather than saying it.
+Cut sentences that announce what follows rather than saying
+it.
 
 | Cut | Replace with |
 |-----|--------------|
 | "Below is a specification..." | "This specification..." |
 | "There is also the matter of X." | Start with X directly |
-| "A further limitation is cultural." | State the limitation: "Sigma requires that the institution accept..." |
-| "It is not advocacy." | Delete (defensive; content speaks for itself) |
+| "A further limitation is cultural." | State the limitation: "Sigma requires..." |
+| "It is not advocacy." | Delete (defensive) |
 
-The "not merely X; it is Y" construction inflates the subject. Just say what it is.
+The "not merely X; it is Y" construction inflates the
+subject. Just say what it is.
 
 | Before | After |
 |--------|-------|
@@ -89,20 +105,22 @@ The "not merely X; it is Y" construction inflates the subject. Just say what it 
 
 ## Filler Words to Cut
 
-These words rarely add meaning. Delete them unless they carry genuine meaning:
+These words rarely add meaning. Delete them unless they carry
+genuine meaning:
 
-- **simply** — "They simply define" → "They define"
-- **itself** — "Iota itself is reliable" → "Iota is reliable" (exception: "truth itself" when referring to the concept of truth, not instances of it)
-- **underlying** — "the underlying intuition" → "the intuition"
-- **actual** — "actual legal standards" → "legal standards"
-- **clearly** — "clearly specified" → "specified"
-- **entirely** — "entirely application-dependent" → "application-dependent"
+- **simply** — "They simply define" -> "They define"
+- **itself** — "Iota itself is reliable" -> "Iota is reliable" (exception: "truth itself" when referring to the concept of truth, not instances of it)
+- **underlying** — "the underlying intuition" -> "the intuition"
+- **actual** — "actual legal standards" -> "legal standards"
+- **clearly** — "clearly specified" -> "specified"
+- **entirely** — "entirely application-dependent" -> "application-dependent"
 - **merely** — see Rhetorical Puffery above
-- **given** (as filler) — "a given question" → "a question"
+- **given** (as filler) — "a given question" -> "a question"
 
 ## Passive Voice
 
-Passive voice often hides the actor or weakens the sentence. Prefer active constructions.
+Passive voice often hides the actor or weakens the sentence.
+Prefer active constructions.
 
 | Passive | Active |
 |---------|--------|
@@ -167,7 +185,9 @@ Avoid jargon that sounds impressive but says little:
 - "institutionalized epistemic humility" — say what the institution actually does
 - "epistemological commitments" — "assumptions"
 
-When tempted to cite a philosopher, ask: does the name add information, or is it decoration? If decoration, cut it and state the idea directly.
+When tempted to cite a philosopher, ask: does the name add
+information, or is it decoration? If decoration, cut it and
+state the idea directly.
 
 ## Redundancy
 
@@ -185,26 +205,36 @@ Avoid vague references.
 
 | Vague | Specific |
 |-------|----------|
-| "This is not always desirable." ("This" *what*?)| "This orientation is not universally desirable." |
+| "This is not always desirable." ("This" *what*?) | "This orientation is not universally desirable." |
 | "In this regard..." | Cut or be specific |
 
 ## Grammar and Mechanics
 
-- **Complete sentences**: Use them. Avoid fragments for effect.
-- **Split infinitives**: "to thoroughly evaluate" → "to evaluate thoroughly"
-- **Articles**: "A Iota" → "An Iota"
-- **Parallelism**: "Neither X, nor Y" with clauses → "Neither X or Y" when both follow a single verb
-- **Hyphens**: "ill posed" → "ill-posed" when used as compound adjective
-- **Semicolons**: Use periods, not semicolons, to separate independent clauses. Semicolons are acceptable in legal-style enumerated lists: (a) first; (b) second; or (c) third.
-- **Spacing**: Single space after periods; no double blank lines between paragraphs
-- **Vague references**: Ensure "this", "that", "it" have clear antecedents
+- **Complete sentences**: Use them. Avoid fragments for
+  effect.
+- **Split infinitives**: "to thoroughly evaluate" ->
+  "to evaluate thoroughly"
+- **Articles**: "A Iota" -> "An Iota"
+- **Parallelism**: "Neither X, nor Y" with clauses ->
+  "Neither X or Y" when both follow a single verb
+- **Hyphens**: "ill posed" -> "ill-posed" when used as
+  compound adjective
+- **Semicolons**: Use periods, not semicolons, to separate
+  independent clauses. Semicolons are acceptable in
+  legal-style enumerated lists: (a) first; (b) second; or
+  (c) third.
+- **Spacing**: Single space after periods; no double blank
+  lines between paragraphs
+- **Vague references**: Ensure "this", "that", "it" have
+  clear antecedents
 
-Consider using singular instead of plural when describing some
-behavior.  Singular can avoid some confusion about one-to-many.
-Example: Instead of writing "X gimzos are associated with Y gizmos"
-consider "An X gizmo is associated with a Y gizmo." That way we don't
-wonder if we're talking about one-to-one or one-to-many.  Not a hard
-rule but instead something to consider.
+Consider using singular instead of plural when describing
+some behavior.  Singular can avoid some confusion about
+one-to-many.  Example: Instead of writing "X gimzos are
+associated with Y gizmos" consider "An X gizmo is associated
+with a Y gizmo." That way we don't wonder if we're talking
+about one-to-one or one-to-many.  Not a hard rule but instead
+something to consider.
 
 ## Banned Words and Phrases
 
@@ -220,7 +250,7 @@ These words are corporate-speak, hipster jargon, or empty:
 - **ecosystem**
 - **synergy**
 - **stakeholder** (unless genuinely appropriate)
-- **robust** (often meaningless; be specific about what makes something strong)
+- **robust** (often meaningless; be specific)
 - **holistic**
 - **streamline**
 - **actionable**
@@ -229,49 +259,80 @@ These words are corporate-speak, hipster jargon, or empty:
 
 ## Acceptable Constructions
 
-Not everything that looks like a pattern needs fixing. These are often fine:
+Not everything that looks like a pattern needs fixing. These
+are often fine:
 
-- **"not only...but also"** when making a substantive contrast (e.g., "reflects not only the evidence but also the evaluator's training")
-- **"In summary"** at the end of a document when genuinely summarizing
-- **"not"** when stating honest limitations (e.g., "Sigma does not eliminate these problems")
-- **"serves two functions: First...Second..."** — clear enumeration is fine
-- **"itself"** when genuinely emphasizing identity (e.g., "Peirce defined truth itself as...")
+- **"not only...but also"** when making a substantive
+  contrast (e.g., "reflects not only the evidence but also
+  the evaluator's training")
+- **"In summary"** at the end of a document when genuinely
+  summarizing
+- **"not"** when stating honest limitations (e.g., "Sigma
+  does not eliminate these problems")
+- **"serves two functions: First...Second..."** — clear
+  enumeration is fine
+- **"itself"** when genuinely emphasizing identity (e.g.,
+  "Peirce defined truth itself as...")
 
 ## Review Process
 
 When reviewing a document:
 
-1. **First pass**: Scan for throat-clearing openings and rhetorical puffery
-2. **Second pass**: Search for filler words (simply, itself, underlying, actual, clearly, entirely, merely)
-3. **Third pass**: Identify passive constructions and weak verbs
+1. **First pass**: Scan for throat-clearing openings and
+   rhetorical puffery
+2. **Second pass**: Search for filler words (simply, itself,
+   underlying, actual, clearly, entirely, merely)
+3. **Third pass**: Identify passive constructions and weak
+   verbs
 4. **Fourth pass**: Flag jargon and stilted phrasing
 5. **Fifth pass**: Check for redundancy and vague pointing
 6. **Final pass**: Grammar and mechanics
 
 Then repeat this entire process at least once.
 
-Read sentences aloud. If a sentence sounds like it's selling something or warming up to say something, it needs revision.
+Read sentences aloud. If a sentence sounds like it's selling
+something or warming up to say something, it needs revision.
 
 ## Examples of Good Revision
 
-**Before**: "Procedure Sigma is not merely a technique for aggregating judgments; it is a response to fundamental problems in epistemology."
+**Before**: "Procedure Sigma is not merely a technique for
+aggregating judgments; it is a response to fundamental
+problems in epistemology."
 
-**After**: "Procedure Sigma is a judgment aggregation technique that addresses fundamental problems in epistemology."
-
----
-
-**Before**: "There is also the matter of independence. Sigma assumes that the independent chains do not share interpretive biases."
-
-**After**: "Sigma assumes that the independent chains do not share interpretive biases."
+**After**: "Procedure Sigma is a judgment aggregation
+technique that addresses fundamental problems in
+epistemology."
 
 ---
 
-**Before**: "The procedure could help identify theses that hold up under repeated scrutiny and distinguish them from theses that depend on fragile or highly contingent assumptions. It could also help expose situations in which equally coherent but incompatible interpretations exist, which is relevant for risk management."
+**Before**: "There is also the matter of independence. Sigma
+assumes that the independent chains do not share interpretive
+biases."
 
-**After**: "The procedure identifies theses that hold up under repeated scrutiny and distinguishes them from theses that depend on fragile or contingent assumptions. It also exposes situations in which equally coherent but incompatible interpretations exist."
+**After**: "Sigma assumes that the independent chains do not
+share interpretive biases."
 
 ---
 
-**Before**: "These Rules provide a framework for determining whether a question yields a stable adjudicative answer when subjected to repeated, independent analysis."
+**Before**: "The procedure could help identify theses that
+hold up under repeated scrutiny and distinguish them from
+theses that depend on fragile or highly contingent
+assumptions. It could also help expose situations in which
+equally coherent but incompatible interpretations exist,
+which is relevant for risk management."
 
-**After**: "These Rules determine whether a question yields a stable adjudicative answer when subjected to repeated, independent analysis."
+**After**: "The procedure identifies theses that hold up
+under repeated scrutiny and distinguishes them from theses
+that depend on fragile or contingent assumptions. It also
+exposes situations in which equally coherent but incompatible
+interpretations exist."
+
+---
+
+**Before**: "These Rules provide a framework for determining
+whether a question yields a stable adjudicative answer when
+subjected to repeated, independent analysis."
+
+**After**: "These Rules determine whether a question yields a
+stable adjudicative answer when subjected to repeated,
+independent analysis."

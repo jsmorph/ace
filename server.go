@@ -2,8 +2,10 @@ package ace
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -29,6 +31,8 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	mux.HandleFunc("/match", srv.handleMatchTest)
 	mux.HandleFunc("/limits", srv.handleLimits)
 	mux.HandleFunc("/stats", srv.handleStats)
+	mux.HandleFunc("/doc", handleDocIndex)
+	mux.HandleFunc("/doc/", handleDocFile)
 	srv.mux = mux
 	return srv
 }
@@ -273,4 +277,34 @@ type errorResponse struct {
 
 func writeError(w http.ResponseWriter, code int, msg string) {
 	writeJSON(w, code, errorResponse{Error: msg})
+}
+
+const docSummary = "ACE is a coordination service for software agents based on the tuple-space model."
+
+func handleDocIndex(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	fmt.Fprintln(w, docSummary)
+	fmt.Fprintln(w)
+	for _, name := range DocFiles {
+		fmt.Fprintf(w, "  /doc/%s\n", name)
+	}
+}
+
+func handleDocFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+	name := strings.TrimPrefix(r.URL.Path, "/doc/")
+	data, err := Docs.ReadFile(name)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "unknown document")
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write(data)
 }

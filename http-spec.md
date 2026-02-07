@@ -1,6 +1,8 @@
 # ACE HTTP API
 
-This document specifies the HTTP interface to ACE. See `spec.md` for the core operations, pattern matching, access control, TTL, blocking, and limits.
+This document specifies the HTTP interface to ACE. See
+`spec.md` for the core operations, pattern matching, access
+control, TTL, blocking, and limits.
 
 ## Endpoints
 
@@ -9,12 +11,15 @@ This document specifies the HTTP interface to ACE. See `spec.md` for the core op
 | POST | `/out` | Write an object |
 | POST | `/in` | Read and remove a matching object |
 | POST | `/rd` | Read a matching object |
-| POST/GET | `/match` | Test whether an object matches a pattern |
+| POST/GET | `/match` | Test object/pattern match |
 | POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return the active limits |
 | GET | `/stats` | Return storage statistics |
+| GET | `/doc` | List embedded documentation |
+| GET | `/doc/{name}` | Return a documentation file |
 
-All request and response bodies use JSON with content type `application/json`.
+All request and response bodies use JSON with content type
+`application/json`.
 
 ## POST /out
 
@@ -32,7 +37,7 @@ Request body:
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `object` | yes | JSON object to store (properties starting with `#` are metadata: stored but not matchable; see `spec.md`) |
+| `object` | yes | JSON object to store (`#` properties are metadata; see `spec.md`) |
 | `access` | no | Access control (see `spec.md`) |
 | `ttl` | no | Time-to-live as ISO 8601 duration (default: 72 hours) |
 
@@ -44,7 +49,10 @@ Response (200):
 
 ## POST /in
 
-Find and remove the earliest matching object. The caller identifies itself with the `X-ACE-ID` header for access control. The header is optional; omit it when objects have no access restrictions.
+Find and remove the earliest matching object. The caller
+identifies itself with the `X-ACE-ID` header for access
+control. The header is optional; omit it when objects have no
+access restrictions.
 
 Request body:
 
@@ -60,7 +68,7 @@ Request body:
 |-------|----------|---------|
 | `pattern` | yes | JSON pattern (see `spec.md`) |
 | `wait` | no | Maximum seconds to block (default: 0) |
-| `since` | no | Return only objects after this identifier |
+| `since` | no | Only objects after this identifier |
 
 Response when a match exists (200):
 
@@ -68,9 +76,11 @@ Response when a match exists (200):
 {"id": "2025-07-14T22:31:05.123456789", "object": {"#id": "job-42", "type": "task", "payload": "compute"}}
 ```
 
-Metadata properties (like `#id`) are returned in the object even though they do not participate in pattern matching.
+Metadata properties (like `#id`) are returned in the object
+even though they do not participate in pattern matching.
 
-When explicit deletes are enabled, the response includes a `delete_id`:
+When explicit deletes are enabled, the response includes a
+`delete_id`:
 
 ```json
 {"id": "2025-07-14T22:31:05.123456789", "object": {"#id": "job-42", "type": "task", "payload": "compute"}, "delete_id": "a1b2c3d4e5f6..."}
@@ -84,11 +94,13 @@ null
 
 ## POST /rd
 
-`/rd` uses the same request and response format as `/in`. The object remains in the space.
+`/rd` uses the same request and response format as `/in`.
+The object remains in the space.
 
 ## POST/GET /match
 
-Test whether an object matches a pattern. This operation does not read from or write to the space.
+Test whether an object matches a pattern. This operation does
+not read from or write to the space.
 
 POST request body:
 
@@ -96,7 +108,8 @@ POST request body:
 {"object": {"type": "task", "priority": 1}, "pattern": {"type": "task"}}
 ```
 
-GET request: pass `object` and `pattern` as query parameters containing URL-encoded JSON.
+GET request: pass `object` and `pattern` as query parameters
+containing URL-encoded JSON.
 
 ```
 GET /match?object=%7B%22type%22%3A%22task%22%7D&pattern=%7B%22type%22%3A%22task%22%7D
@@ -115,7 +128,9 @@ Response (200):
 
 ## POST/GET /del
 
-Confirm deletion of an object previously returned by `/in` with explicit deletes enabled. See `spec.md` for the explicit deletes mechanism.
+Confirm deletion of an object previously returned by `/in`
+with explicit deletes enabled. See `spec.md` for the explicit
+deletes mechanism.
 
 POST request body:
 
@@ -139,11 +154,13 @@ Response (200):
 {"deleted": true}
 ```
 
-Returns `{"deleted": false}` if the `delete_id` is invalid or its visibility timeout has expired.
+Returns `{"deleted": false}` if the `delete_id` is invalid
+or its visibility timeout has expired.
 
 ## GET /limits
 
-Returns the active limits as a JSON object. See `spec.md` for the list of properties and defaults.
+Returns the active limits as a JSON object. See `spec.md`
+for the list of properties and defaults.
 
 ## GET /stats
 
@@ -162,9 +179,30 @@ Returns storage statistics.
 }
 ```
 
+## GET /doc
+
+Returns a plain-text index listing the embedded
+documentation files.
+
+```
+ACE is a coordination service for software agents based on the tuple-space model.
+
+  /doc/README.md
+  /doc/spec.md
+  /doc/http-spec.md
+  /doc/cli-spec.md
+  /doc/guide.md
+```
+
+## GET /doc/{name}
+
+Returns the content of the named documentation file as
+`text/plain; charset=utf-8`. Returns 404 for unknown names.
+
 ## Errors
 
-Errors return an appropriate HTTP status code with a JSON body:
+Errors return an appropriate HTTP status code with a JSON
+body:
 
 ```json
 {"error": "object size is 3000 > 2048 bytes"}
@@ -172,11 +210,15 @@ Errors return an appropriate HTTP status code with a JSON body:
 
 | Status | Meaning |
 |--------|---------|
-| 400 | Invalid request: malformed JSON, missing required fields, or limit violations |
+| 400 | Invalid request: malformed JSON, missing fields, or limit violations |
 | 405 | Wrong HTTP method for the endpoint |
 | 500 | Internal error |
 | 503 | Too many waiting clients (see max waiters) |
 
 ## Max waiters
 
-The server accepts a maximum concurrent waiters parameter. When the number of blocked `/in` and `/rd` requests reaches this limit, new blocking requests receive 503. Non-blocking requests (those with `wait` absent or zero) pass through regardless. A limit of zero means unlimited.
+The server accepts a maximum concurrent waiters parameter.
+When the number of blocked `/in` and `/rd` requests reaches
+this limit, new blocking requests receive 503. Non-blocking
+requests (those with `wait` absent or zero) pass through
+regardless. A limit of zero means unlimited.

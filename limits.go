@@ -189,7 +189,7 @@ func (l Limits) walkPattern(obj map[string]interface{}, path string) (int, error
 	return leaves, nil
 }
 
-// ValidateAccess checks an access value against size and length limits.
+// ValidateAccess checks an access value against size, length, and semantic limits.
 func (l Limits) ValidateAccess(raw []byte) error {
 	if len(raw) > l.AccessSize {
 		return fmt.Errorf("access size is %d > %d bytes", len(raw), l.AccessSize)
@@ -198,16 +198,25 @@ func (l Limits) ValidateAccess(raw []byte) error {
 	if err := json.Unmarshal(raw, &acc); err != nil {
 		return fmt.Errorf("access is not valid JSON: %w", err)
 	}
+	if acc.In != nil && len(acc.In) == 0 && acc.Rd != nil && len(acc.Rd) == 0 {
+		return fmt.Errorf("access denies both in and rd; object would be inaccessible")
+	}
 	total := len(acc.In) + len(acc.Rd)
 	if total > l.AccessLength {
 		return fmt.Errorf("access has %d > %d identifiers", total, l.AccessLength)
 	}
 	for _, id := range acc.In {
+		if id == "!" {
+			return fmt.Errorf("access in ID %q is reserved", id)
+		}
 		if len(id) > l.IDSize {
 			return fmt.Errorf("access in ID is %d > %d bytes", len(id), l.IDSize)
 		}
 	}
 	for _, id := range acc.Rd {
+		if id == "!" {
+			return fmt.Errorf("access rd ID %q is reserved", id)
+		}
 		if len(id) > l.IDSize {
 			return fmt.Errorf("access rd ID is %d > %d bytes", len(id), l.IDSize)
 		}
@@ -226,16 +235,20 @@ func (l Limits) ValidateTTL(d time.Duration) error {
 	return nil
 }
 
-// ValidateCallerID checks that a caller ID is within the size limit.
+// ValidateCallerID checks that a caller ID is within the size limit and not reserved.
 func (l Limits) ValidateCallerID(id string) error {
+	if id == "!" {
+		return fmt.Errorf("caller ID %q is reserved", id)
+	}
 	if len(id) > l.IDSize {
 		return fmt.Errorf("caller ID is %d > %d bytes", len(id), l.IDSize)
 	}
 	return nil
 }
 
-// Access restricts which callers may retrieve an object.
+// Access restricts which callers may retrieve an object. A nil slice means
+// unrestricted; an empty non-nil slice means no caller is permitted.
 type Access struct {
-	In []string `json:"in,omitempty"`
-	Rd []string `json:"rd,omitempty"`
+	In []string `json:"in"`
+	Rd []string `json:"rd"`
 }

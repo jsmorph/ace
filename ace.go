@@ -148,9 +148,19 @@ func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (
 	}
 
 	if access != nil {
+		if access.In != nil && len(access.In) == 0 {
+			if _, err := tx.Exec("INSERT INTO access (id, type, iid) VALUES (?, 'in', '!')", id); err != nil {
+				return "", fmt.Errorf("insert access in deny: %w", err)
+			}
+		}
 		for _, iid := range access.In {
 			if _, err := tx.Exec("INSERT INTO access (id, type, iid) VALUES (?, 'in', ?)", id, iid); err != nil {
 				return "", fmt.Errorf("insert access in: %w", err)
+			}
+		}
+		if access.Rd != nil && len(access.Rd) == 0 {
+			if _, err := tx.Exec("INSERT INTO access (id, type, iid) VALUES (?, 'rd', '!')", id); err != nil {
+				return "", fmt.Errorf("insert access rd deny: %w", err)
 			}
 		}
 		for _, iid := range access.Rd {

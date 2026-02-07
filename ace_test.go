@@ -231,6 +231,121 @@ func TestNoAccessRestriction(t *testing.T) {
 	}
 }
 
+func TestAccessEmptyInDeniesAll(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	acc := &Access{In: []string{}}
+	_, err := s.Out(json.RawMessage(`{"a":1}`), acc, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No caller can consume the object.
+	r, err := s.In(ctx, "agent-1", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		t.Fatal("empty in list should deny all callers")
+	}
+
+	// But any caller can read it (rd is unrestricted).
+	r, err = s.Rd(ctx, "agent-1", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil {
+		t.Fatal("rd should be unrestricted when only in is empty")
+	}
+}
+
+func TestAccessEmptyRdDeniesAll(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	acc := &Access{Rd: []string{}}
+	_, err := s.Out(json.RawMessage(`{"a":1}`), acc, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No caller can read the object.
+	r, err := s.Rd(ctx, "agent-1", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		t.Fatal("empty rd list should deny all callers")
+	}
+
+	// But any caller can consume it (in is unrestricted).
+	r, err = s.In(ctx, "agent-1", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil {
+		t.Fatal("in should be unrestricted when only rd is empty")
+	}
+}
+
+func TestAccessBothEmptyRejected(t *testing.T) {
+	s := newTestSpace(t)
+
+	acc := &Access{In: []string{}, Rd: []string{}}
+	_, err := s.Out(json.RawMessage(`{"a":1}`), acc, 0)
+	if err == nil {
+		t.Fatal("expected error for access that denies both in and rd")
+	}
+}
+
+func TestAccessNilFieldUnrestricted(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	acc := &Access{In: []string{"alice"}, Rd: nil}
+	_, err := s.Out(json.RawMessage(`{"a":1}`), acc, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Only alice can consume.
+	r, err := s.In(ctx, "bob", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r != nil {
+		t.Fatal("bob should not have in access")
+	}
+
+	// Anyone can read (rd is nil = unrestricted).
+	r, err = s.Rd(ctx, "anyone", json.RawMessage(`{"a":1}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil {
+		t.Fatal("nil rd should be unrestricted")
+	}
+}
+
+func TestAccessBangDisallowed(t *testing.T) {
+	limits := DefaultLimits()
+
+	if err := limits.ValidateCallerID("!"); err == nil {
+		t.Fatal("expected error for reserved caller ID !")
+	}
+
+	raw := []byte(`{"in":["!"]}`)
+	if err := limits.ValidateAccess(raw); err == nil {
+		t.Fatal("expected error for reserved access ID !")
+	}
+
+	raw = []byte(`{"rd":["!"]}`)
+	if err := limits.ValidateAccess(raw); err == nil {
+		t.Fatal("expected error for reserved access ID ! in rd")
+	}
+}
+
 func TestSinceFiltering(t *testing.T) {
 	s := newTestSpace(t)
 	ctx := context.Background()
