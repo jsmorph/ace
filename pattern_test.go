@@ -74,9 +74,9 @@ func TestBuildMatchQuerySimple(t *testing.T) {
 	if !strings.Contains(query, "NOT EXISTS") {
 		t.Fatalf("expected access check, got: %s", query)
 	}
-	// 2 base (expires, since) + 1 branch + 3 access (type, type, callerID) = 6
-	if len(args) != 6 {
-		t.Fatalf("expected 6 args, got %d: %v", len(args), args)
+	// 3 base (expires, invisible_until, since) + 1 branch + 3 access (type, type, callerID) = 7
+	if len(args) != 7 {
+		t.Fatalf("expected 7 args, got %d: %v", len(args), args)
 	}
 }
 
@@ -88,9 +88,9 @@ func TestBuildMatchQueryArrayLeaf(t *testing.T) {
 	if !strings.Contains(query, "br.b IN (?, ?)") {
 		t.Fatalf("expected IN clause, got: %s", query)
 	}
-	// 2 base + 2 branch alts + 3 access = 7
-	if len(args) != 7 {
-		t.Fatalf("expected 7 args, got %d: %v", len(args), args)
+	// 3 base + 2 branch alts + 3 access = 8
+	if len(args) != 8 {
+		t.Fatalf("expected 8 args, got %d: %v", len(args), args)
 	}
 }
 
@@ -106,8 +106,8 @@ func TestBuildMatchQueryMultipleBranches(t *testing.T) {
 	if existsCount != 2 {
 		t.Fatalf("expected 2 branch EXISTS clauses, got %d in: %s", existsCount, query)
 	}
-	// 2 base + 1 + 2 branch alts + 3 access = 8
-	if len(args) != 8 {
-		t.Fatalf("expected 8 args, got %d: %v", len(args), args)
+	// 3 base + 1 + 2 branch alts + 3 access = 9
+	if len(args) != 9 {
+		t.Fatalf("expected 9 args, got %d: %v", len(args), args)
 	}
 }

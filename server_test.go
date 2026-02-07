@@ -259,6 +259,11 @@ func newTestServerHTTP(t *testing.T, maxWaiters int) (*httptest.Server, *Space) 
 	t.Helper()
 	cfg := DefaultConfig()
 	cfg.Blocking = BlockingNotify
+	return newTestServerHTTPWithConfig(t, cfg, maxWaiters)
+}
+
+func newTestServerHTTPWithConfig(t *testing.T, cfg Config, maxWaiters int) (*httptest.Server, *Space) {
+	t.Helper()
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
 	space, err := NewSpace(dbPath, cfg)
@@ -385,4 +390,150 @@ func TestServerMaxWaitersAllowsNonBlocking(t *testing.T) {
 		t.Fatal(err)
 	}
 	wg.Wait()
+}
+
+func newTestServerDeletes(t *testing.T) *httptest.Server {
+	t.Helper()
+	cfg := DefaultConfig()
+	cfg.Blocking = BlockingNotify
+	cfg.Deletes = true
+	cfg.VisibilityTimeout = 5 * time.Second
+	ts, _ := newTestServerHTTPWithConfig(t, cfg, 0)
+	return ts
+}
+
+func serverOut(t *testing.T, ts *httptest.Server, object string) {
+	t.Helper()
+	resp, err := http.Post(ts.URL+"/out", "application/json", strings.NewReader(`{"object":`+object+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("out: expected 200, got %d", resp.StatusCode)
+	}
+}
+
+func serverIn(t *testing.T, ts *httptest.Server, pattern string) *Result {
+	t.Helper()
+	resp, err := http.Post(ts.URL+"/in", "application/json", strings.NewReader(`{"pattern":`+pattern+`}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("in: expected 200, got %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if strings.TrimSpace(string(body)) == "null" {
+		return nil
+	}
+	var r Result
+	if err := json.Unmarshal(body, &r); err != nil {
+		t.Fatal(err)
+	}
+	return &r
+}
+
+func TestServerDelPost(t *testing.T) {
+	ts := newTestServerDeletes(t)
+
+	serverOut(t, ts, `{"a":1}`)
+	r := serverIn(t, ts, `{"a":1}`)
+	if r == nil || r.DeleteID == "" {
+		t.Fatal("expected result with delete_id")
+	}
+
+	// POST /del with the delete_id
+	resp, err := http.Post(ts.URL+"/del", "application/json",
+		strings.NewReader(`{"delete_id":"`+r.DeleteID+`"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("del: expected 200, got %d", resp.StatusCode)
+	}
+	var dr delResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
+		t.Fatal(err)
+	}
+	if !dr.Deleted {
+		t.Fatal("expected deleted=true")
+	}
+
+	// Second del: should return false
+	resp2, err := http.Post(ts.URL+"/del", "application/json",
+		strings.NewReader(`{"delete_id":"`+r.DeleteID+`"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	var dr2 delResponse
+	if err := json.NewDecoder(resp2.Body).Decode(&dr2); err != nil {
+		t.Fatal(err)
+	}
+	if dr2.Deleted {
+		t.Fatal("expected deleted=false on second attempt")
+	}
+}
+
+func TestServerDelGet(t *testing.T) {
+	ts := newTestServerDeletes(t)
+
+	serverOut(t, ts, `{"a":1}`)
+	r := serverIn(t, ts, `{"a":1}`)
+	if r == nil || r.DeleteID == "" {
+		t.Fatal("expected result with delete_id")
+	}
+
+	// GET /del?delete_id=...
+	resp, err := http.Get(ts.URL + "/del?delete_id=" + r.DeleteID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		t.Fatalf("del GET: expected 200, got %d", resp.StatusCode)
+	}
+	var dr delResponse
+	if err := json.NewDecoder(resp.Body).Decode(&dr); err != nil {
+		t.Fatal(err)
+	}
+	if !dr.Deleted {
+		t.Fatal("expected deleted=true via GET")
+	}
+}
+
+func TestServerDelMethodNotAllowed(t *testing.T) {
+	ts := newTestServerDeletes(t)
+
+	req, err := http.NewRequest("PUT", ts.URL+"/del", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 405 {
+		t.Fatalf("expected 405, got %d", resp.StatusCode)
+	}
+}
+
+func TestServerDelMissingID(t *testing.T) {
+	ts := newTestServerDeletes(t)
+
+	resp, err := http.Post(ts.URL+"/del", "application/json", strings.NewReader(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 400 {
+		t.Fatalf("expected 400 for missing delete_id, got %d", resp.StatusCode)
+	}
 }

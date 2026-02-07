@@ -55,6 +55,10 @@ The `since` parameter restricts results to objects with identifiers strictly gre
 
 `rd(callerID, pattern, wait, since)` finds the earliest matching object without removing it. Parameters and behavior match `in` except that the object remains in the space.
 
+### del
+
+`del(deleteID)` permanently deletes an object that `in` previously marked invisible. The `deleteID` is a cryptographic token that `in` returns when explicit deletes are enabled (see Explicit Deletes). `del` returns true if the object was deleted, false if the `deleteID` was invalid or its visibility timeout had already expired.
+
 ### Ordering
 
 `in` and `rd` return the matching object with the smallest identifier. The effect is FIFO ordering.
@@ -106,6 +110,17 @@ A caller with no identity (empty `callerID`) can retrieve unrestricted objects b
 Every object has a time-to-live. If `out` receives no `ttl`, the default is 72 hours. The TTL must be positive and must not exceed the maximum (default: 7 days).
 
 An object's expiration time equals its creation time plus its TTL. `in` and `rd` skip expired objects. Periodic cleanup removes them from storage.
+
+## Explicit deletes
+
+When explicit deletes are enabled, `in` does not remove objects immediately. Instead it marks the object invisible and returns a `delete_id`: a 32-character hex string generated with a cryptographically secure random source. The caller must confirm deletion by calling `del(delete_id)` within the visibility timeout (default: 30 seconds). If `del` does not arrive in time, the object reappears in the space and becomes eligible for another `in`.
+
+Two invariants hold:
+
+1. No two active `delete_id` values can refer to the same object simultaneously. An object receives a `delete_id` only when selected by `in`, and `in` skips objects with an active (non-expired) visibility timeout.
+2. A `delete_id` whose visibility timeout has expired cannot delete anything. `del` checks that the timeout has not passed before deleting.
+
+When explicit deletes are disabled (the default), `in` deletes objects immediately and returns no `delete_id`.
 
 ## Blocking
 

@@ -233,18 +233,6 @@ All subcommands also accept `--db FILENAME`, which defaults to
 
 - [ ]  Update `ace stats` to include the number of expired objects.
 
-
-## Roadmap
-
- For later. Do *not* pursue now.
- 
-- [ ]  Maybe: Extend matching behavior: If a property starts with a
-       `#`, then ignore that branch in all forms of pattern matching
-       (taking care with Quamina use).
-
-- [ ] Server-sent events to deliver multiple objects asynchronously
-      for `in` and `rd` operations if requested.
-
 - [ ] Explicit deletes: Like SQS, an `in` should be followed by a
 	  `del(DID)` (new operation) within a "visibility timeout", which
 	  defaults to 30 seconds.  `DID` is an opaque, cryptographically
@@ -267,6 +255,33 @@ All subcommands also accept `--db FILENAME`, which defaults to
 
 	  This feature is enabled with a CLI switch `--deletes` (supported
       by `ace serve` and `ace in`).
+
+- [ ] `/del` should also support `GET` requests.
+
+- [ ] Make sure we have the right SQL indexes for these tables.  Maybe
+      look at query plans (in a test or just at command line) to be
+      sure.
+	  
+- [ ] Add time monitoring for all database transactions (including
+      queries).  If an operation takes longer that
+      `DBOperationTimeMonitorLimit` (default 1 second, then log (to
+      `stderr`): `WARN high latency ACTUAL_DURATION for
+      SHORT_DESCRIPTION_OF_OP`. Note that high latency is *not* an
+      error.
+	  
+## Roadmap
+
+ For later. Do *not* pursue now.
+ 
+- [ ] Maybe: Support updating visibility timeout for an emitted object
+      (as in SQS).
+ 
+- [ ]  Maybe: Extend matching behavior: If a property starts with a
+       `#`, then ignore that branch in all forms of pattern matching
+       (taking care with Quamina use).
+
+- [ ] Server-sent events to deliver multiple objects asynchronously
+      for `in` and `rd` operations if requested.
 
 - [ ] Maybe? Modify `ace in` to accept `--n N`, which gets `N`
       objects, each of which is written on its own line to `stdout`.

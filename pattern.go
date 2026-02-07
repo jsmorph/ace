@@ -67,6 +67,9 @@ func BuildMatchQuery(branches []PatternBranch, accessType string, callerID strin
 	b.WriteString("SELECT o.id, o.json FROM objects o WHERE o.expires > ?")
 	args = append(args, now.UTC().Format(idFormat))
 
+	b.WriteString(" AND (o.invisible_until IS NULL OR o.invisible_until <= ?)")
+	args = append(args, now.UTC().Format(idFormat))
+
 	b.WriteString(" AND o.id > ?")
 	args = append(args, since)
 

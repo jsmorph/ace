@@ -22,6 +22,7 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	mux.HandleFunc("/out", srv.handleOut)
 	mux.HandleFunc("/in", srv.handleIn)
 	mux.HandleFunc("/rd", srv.handleRd)
+	mux.HandleFunc("/del", srv.handleDel)
 	mux.HandleFunc("/limits", srv.handleLimits)
 	mux.HandleFunc("/stats", srv.handleStats)
 	srv.mux = mux
@@ -140,6 +141,46 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+type delRequest struct {
+	DeleteID string `json:"delete_id"`
+}
+
+type delResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
+func (srv *Server) handleDel(w http.ResponseWriter, r *http.Request) {
+	var deleteID string
+
+	switch r.Method {
+	case http.MethodGet:
+		deleteID = r.URL.Query().Get("delete_id")
+	case http.MethodPost:
+		var req delRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+			return
+		}
+		deleteID = req.DeleteID
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "GET or POST required")
+		return
+	}
+
+	if deleteID == "" {
+		writeError(w, http.StatusBadRequest, "delete_id is required")
+		return
+	}
+
+	deleted, err := srv.space.Del(deleteID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, delResponse{Deleted: deleted})
 }
 
 func (srv *Server) handleLimits(w http.ResponseWriter, r *http.Request) {

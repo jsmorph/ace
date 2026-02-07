@@ -46,6 +46,32 @@ Quamina is not thread-safe, so all access is serialized by `Notifier.mu`. Channe
 
 Ace patterns convert to Quamina format by wrapping atomic leaves in arrays: `{"a":1}` becomes `{"a":[1]}`. Array leaves are already in Quamina format.
 
+## Indexes
+
+The hot query path is `BuildMatchQuery`, which scans `objects` by primary key and runs correlated `EXISTS` subqueries against `branches` and `access` for each candidate row.
+
+| Index | Columns | Purpose |
+|-------|---------|---------|
+| PK | `objects(id)` | ORDER BY id ASC LIMIT 1 in match queries |
+| `idx_branches` | `branches(id, b)` | Covering index for `WHERE br.id = o.id AND br.b = ?` |
+| `idx_access` | `access(id, type, iid)` | Covering index for both access EXISTS clauses |
+| `idx_objects_delete_id` | `objects(delete_id) WHERE delete_id IS NOT NULL` | Partial index for `Del` lookups |
+| `idx_objects_expires` | `objects(expires)` | For `DeleteExpired` and the expiration filter in match queries |
+
+The `branches` index was originally on `(b)` alone, which forced SQLite to scan all rows with a matching branch value across every object. The composite `(id, b)` turns each correlated EXISTS into a direct two-column lookup. The `access` index was `(id, type)`; extending it to include `iid` makes the authorized-caller check a covering-index lookup. The partial index on `delete_id` excludes rows where `delete_id IS NULL` (the majority), keeping the index small.
+
+`TestQueryPlans` verifies via `EXPLAIN QUERY PLAN` that all subqueries use SEARCH with the expected indexes. This prevents regressions.
+
+## Latency Monitoring
+
+`Config.DBOperationTimeMonitorLimit` (default 1 second) controls a per-operation timer. When any database operation (`out`, `in`, `rd`, `del`, `delete expired`, `stats`) exceeds this threshold, a warning is logged to stderr:
+
+```
+WARN high latency 1.234s for out
+```
+
+A limit of 0 disables monitoring. High latency is informational, not an error. The `logSlowOp` method captures `time.Now()` on entry and checks elapsed time on return via `defer`.
+
 ## Spec Typo
 
 Lines 101-102 of `spec.md` reference `access.out`, but the API definition (lines 55-58) defines the access fields as `in` and `rd`. The implementation uses `in` and `rd`.
@@ -59,3 +85,11 @@ Lines 101-102 of `spec.md` reference `access.out`, but the API definition (lines
 **Notification as wake-up signal, not data delivery.** The Quamina notification sends a signal, not the matched object. The waiter always re-executes the SQL query. This keeps all correctness logic (access control, `since` filtering, `in`-delete atomicity) in one place. False wake-ups (access mismatch, consumed by another `in` waiter) are harmless: one extra SQL query, then back to sleep.
 
 **Single DB connection.** `SetMaxOpenConns(1)` is the simplest correct configuration for SQLite. If read contention becomes measurable, split into writer + reader pool.
+
+## Explicit Deletes
+
+SQS-style visibility timeout for `in` operations. When `Config.Deletes` is true, `in` does not delete the object row. Instead it sets `delete_id` (a 32-character hex token from `crypto/rand`) and `invisible_until` (timestamp = now + visibility timeout). The query filter `(invisible_until IS NULL OR invisible_until <= now)` hides the object during this window.
+
+`Del(deleteID)` permanently deletes the object by executing `DELETE FROM objects WHERE delete_id = ? AND invisible_until > now`. The `invisible_until > now` check prevents stale delete_ids from taking effect after the timeout expires.
+
+The no-overlap invariant holds because: (1) `in` only selects visible objects (invisible_until IS NULL or in the past), so an object with an active delete_id is skipped. (2) The SELECT + UPDATE runs inside a transaction with `SetMaxOpenConns(1)`, making it atomic. (3) After the timeout expires, the old delete_id remains but `Del` rejects it due to the `invisible_until > now` check. A new `in` can then select the object and assign a fresh delete_id.

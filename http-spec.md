@@ -9,6 +9,7 @@ This document specifies the HTTP interface to ACE. See `spec.md` for the core op
 | POST | `/out` | Write an object |
 | POST | `/in` | Read and remove a matching object |
 | POST | `/rd` | Read a matching object |
+| POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return the active limits |
 | GET | `/stats` | Return storage statistics |
 
@@ -66,6 +67,12 @@ Response when a match exists (200):
 {"id": "2025-07-14T22:31:05.123456789", "object": {"type": "task", "payload": "compute"}}
 ```
 
+When explicit deletes are enabled, the response includes a `delete_id`:
+
+```json
+{"id": "2025-07-14T22:31:05.123456789", "object": {"type": "task", "payload": "compute"}, "delete_id": "a1b2c3d4e5f6..."}
+```
+
 Response when no match exists (200):
 
 ```json
@@ -75,6 +82,34 @@ null
 ## POST /rd
 
 `/rd` uses the same request and response format as `/in`. The object remains in the space.
+
+## POST/GET /del
+
+Confirm deletion of an object previously returned by `/in` with explicit deletes enabled. See `spec.md` for the explicit deletes mechanism.
+
+POST request body:
+
+```json
+{"delete_id": "a1b2c3d4e5f6..."}
+```
+
+GET request: pass `delete_id` as a query parameter.
+
+```
+GET /del?delete_id=a1b2c3d4e5f6...
+```
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `delete_id` | yes | Deletion ID returned by `/in` |
+
+Response (200):
+
+```json
+{"deleted": true}
+```
+
+Returns `{"deleted": false}` if the `delete_id` is invalid or its visibility timeout has expired.
 
 ## GET /limits
 

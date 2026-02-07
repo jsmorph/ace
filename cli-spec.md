@@ -16,6 +16,8 @@ Start the HTTP server.
 | `--blocking` | `notify` | Blocking implementation: `polling` or `notify` |
 | `--scavenge` | `PT1H` | Interval for deleting expired objects (ISO 8601) |
 | `--max-waiters` | 0 | Max concurrent blocking clients; 0 means unlimited |
+| `--deletes` | false | Enable explicit deletes (visibility timeout) |
+| `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601 duration) |
 
 The server deletes expired objects at the scavenge interval.
 
@@ -44,12 +46,27 @@ Find and remove the earliest matching object without blocking.
 | `--pattern` | (stdin) | JSON pattern |
 | `--since` | (none) | Return only objects after this identifier |
 | `--id` | (none) | Caller identity for access control |
+| `--deletes` | false | Enable explicit deletes |
 
-If `--pattern` is absent or `-`, the command reads the pattern from stdin. Output is a JSON result or `null` if no match exists.
+If `--pattern` is absent or `-`, the command reads the pattern from stdin. Output is a JSON result or `null` if no match exists. When `--deletes` is set, the result includes a `delete_id` field.
 
 ## ace rd
 
 `ace rd` uses the same flags as `ace in`. The object remains in the space.
+
+## ace del
+
+Confirm deletion of an object previously returned by `ace in --deletes`. See `spec.md` for the explicit deletes mechanism.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--delete-id` | (required) | Deletion ID returned by `ace in` |
+
+Output:
+
+```json
+{"deleted": true}
+```
 
 ## ace stats
 

@@ -3,10 +3,13 @@ package ace
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -23,8 +26,9 @@ type Space struct {
 }
 
 type Result struct {
-	ID     string          `json:"id"`
-	Object json.RawMessage `json:"object"`
+	ID       string          `json:"id"`
+	Object   json.RawMessage `json:"object"`
+	DeleteID string          `json:"delete_id,omitempty"`
 }
 
 func NewSpace(dbPath string, cfg Config) (*Space, error) {
@@ -72,7 +76,21 @@ func (s *Space) Limits() Limits {
 	return s.cfg.Limits
 }
 
+func (s *Space) logSlowOp(desc string) func() {
+	if s.cfg.DBOperationTimeMonitorLimit <= 0 {
+		return func() {}
+	}
+	start := time.Now()
+	return func() {
+		d := time.Since(start)
+		if d >= s.cfg.DBOperationTimeMonitorLimit {
+			log.Printf("WARN high latency %s for %s", d, desc)
+		}
+	}
+}
+
 func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (retID string, retErr error) {
+	defer s.logSlowOp("out")()
 	if ttl == 0 {
 		ttl = defaultTTL
 	}
@@ -194,6 +212,7 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 }
 
 func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
+	defer s.logSlowOp(accessType)()
 	query, args := BuildMatchQuery(pbs, accessType, callerID, since, time.Now())
 
 	if !remove {
@@ -227,15 +246,36 @@ func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID st
 		return nil, fmt.Errorf("query: %w", err)
 	}
 
-	if _, err := tx.Exec("DELETE FROM objects WHERE id = ?", id); err != nil {
-		return nil, fmt.Errorf("delete object: %w", err)
+	result := &Result{ID: id, Object: json.RawMessage(jsonStr)}
+
+	if s.cfg.Deletes {
+		did, err := generateDeleteID()
+		if err != nil {
+			return nil, fmt.Errorf("generate delete id: %w", err)
+		}
+		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(idFormat)
+		if _, err := tx.Exec("UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ?", did, invisibleUntil, id); err != nil {
+			return nil, fmt.Errorf("mark invisible: %w", err)
+		}
+		result.DeleteID = did
+	} else {
+		if _, err := tx.Exec("DELETE FROM objects WHERE id = ?", id); err != nil {
+			return nil, fmt.Errorf("delete object: %w", err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit: %w", err)
 	}
 
-	return &Result{ID: id, Object: json.RawMessage(jsonStr)}, nil
+	if s.notifier != nil && result.DeleteID != "" {
+		obj := json.RawMessage(jsonStr)
+		time.AfterFunc(s.cfg.VisibilityTimeout, func() {
+			s.notifier.Notify(obj)
+		})
+	}
+
+	return result, nil
 }
 
 func (s *Space) waitNotify(ctx context.Context, pattern json.RawMessage, queryFn func() (*Result, error), deadline time.Time) (*Result, error) {
@@ -313,7 +353,33 @@ func (s *Space) poll(ctx context.Context, queryFn func() (*Result, error), deadl
 	}
 }
 
+func (s *Space) Del(deleteID string) (bool, error) {
+	defer s.logSlowOp("del")()
+	if deleteID == "" {
+		return false, fmt.Errorf("delete_id is required")
+	}
+	now := time.Now().UTC().Format(idFormat)
+	res, err := s.db.Exec("DELETE FROM objects WHERE delete_id = ? AND invisible_until > ?", deleteID, now)
+	if err != nil {
+		return false, fmt.Errorf("delete: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("rows affected: %w", err)
+	}
+	return n > 0, nil
+}
+
+func generateDeleteID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 func (s *Space) DeleteExpired() (int64, error) {
+	defer s.logSlowOp("delete expired")()
 	now := time.Now().UTC().Format(idFormat)
 	res, err := s.db.Exec("DELETE FROM objects WHERE expires <= ?", now)
 	if err != nil {
@@ -349,6 +415,7 @@ type Stats struct {
 }
 
 func (s *Space) Stats() (*Stats, error) {
+	defer s.logSlowOp("stats")()
 	var st Stats
 
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects").Scan(&st.Objects); err != nil {
