@@ -38,8 +38,11 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	return srv
 }
 
+const maxRequestBytes = 4096
+
 // ServeHTTP implements http.Handler.
 func (srv *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxRequestBytes)
 	srv.mux.ServeHTTP(w, r)
 }
 
@@ -82,6 +85,10 @@ func (srv *Server) handleOut(w http.ResponseWriter, r *http.Request) {
 		ttl, err = ParseISO8601Duration(req.TTL)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, "invalid ttl: "+err.Error())
+			return
+		}
+		if ttl <= 0 {
+			writeError(w, http.StatusBadRequest, "ttl must be positive")
 			return
 		}
 	}
@@ -293,6 +300,9 @@ func parseWaitField(raw json.RawMessage) (time.Duration, error) {
 	// Try as number (seconds).
 	var n float64
 	if err := json.Unmarshal(raw, &n); err == nil {
+		if n < 0 {
+			return 0, fmt.Errorf("wait must not be negative")
+		}
 		return time.Duration(n * float64(time.Second)), nil
 	}
 	// Try as string.
@@ -300,7 +310,14 @@ func parseWaitField(raw json.RawMessage) (time.Duration, error) {
 	if err := json.Unmarshal(raw, &s); err != nil {
 		return 0, fmt.Errorf("expected number or duration string")
 	}
-	return ParseWait(s)
+	d, err := ParseWait(s)
+	if err != nil {
+		return 0, err
+	}
+	if d < 0 {
+		return 0, fmt.Errorf("wait must not be negative")
+	}
+	return d, nil
 }
 
 func httpStatusForError(err error) int {

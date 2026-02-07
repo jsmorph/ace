@@ -708,3 +708,32 @@ func TestServerWaitInvalidString(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestServerNegativeWaitRejected(t *testing.T) {
+	srv := newTestServer(t)
+
+	cases := []string{
+		`{"pattern":{},"wait":-5}`,
+		`{"pattern":{},"wait":"-5s"}`,
+	}
+	for _, body := range cases {
+		req := httptest.NewRequest("POST", "/rd", bytes.NewBufferString(body))
+		w := httptest.NewRecorder()
+		srv.ServeHTTP(w, req)
+		if w.Code != 400 {
+			t.Fatalf("body %s: expected 400, got %d: %s", body, w.Code, w.Body.String())
+		}
+	}
+}
+
+func TestServerZeroTTLRejected(t *testing.T) {
+	srv := newTestServer(t)
+
+	body := `{"object":{"a":1},"ttl":"PT0S"}`
+	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
