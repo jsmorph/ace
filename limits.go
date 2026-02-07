@@ -7,18 +7,18 @@ import (
 )
 
 type Limits struct {
-	ObjectSize         int           `json:"object_size"`
-	PropertySize       int           `json:"property_size"`
-	ObjectValueSize    int           `json:"object_value_size"`
-	ObjectLeaves       int           `json:"object_leaves"`
-	PatternSize        int           `json:"pattern_size"`
-	PatternLeaves      int           `json:"pattern_leaves"`
-	PatternArrayLength int           `json:"pattern_array_length"`
-	PatternAtomicLength int          `json:"pattern_atomic_length"`
-	AccessSize         int           `json:"access_size"`
-	AccessLength       int           `json:"access_length"`
-	TTLMax             time.Duration `json:"ttl_max"`
-	IDSize             int           `json:"id_size"`
+	ObjectSize          int           `json:"object_size"`
+	PropertySize        int           `json:"property_size"`
+	ObjectValueSize     int           `json:"object_value_size"`
+	ObjectLeaves        int           `json:"object_leaves"`
+	PatternSize         int           `json:"pattern_size"`
+	PatternLeaves       int           `json:"pattern_leaves"`
+	PatternArrayLength  int           `json:"pattern_array_length"`
+	PatternAtomicLength int           `json:"pattern_atomic_length"`
+	AccessSize          int           `json:"access_size"`
+	AccessLength        int           `json:"access_length"`
+	TTLMax              time.Duration `json:"ttl_max"`
+	IDSize              int           `json:"id_size"`
 }
 
 func DefaultLimits() Limits {
