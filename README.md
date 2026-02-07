@@ -8,7 +8,7 @@ In 1985, David Gelernter introduced Linda, a coordination language for parallel 
 
 Autonomous AI agents face the same coordination problem. An orchestrator decomposes work into tasks. Worker agents claim tasks, produce results, and may spawn further tasks. Monitors observe progress. The number and identity of agents can change at any time. Message queues and pub/sub systems handle some of these patterns, but they require the sender to choose a destination queue or topic. A tuple space lets agents coordinate through the content of the data: write a JSON object describing a task, and any agent whose pattern matches it can retrieve it. No routing configuration, no queue names, no broker topics.
 
-ACE adapts Gelernter's model for this setting, replacing tuples with JSON objects and adding access control, TTL, and an HTTP interface.
+ACE adapts Gelernter's model for this setting, replacing tuples with JSON objects and adding access control, TTL, and an HTTP interface. The [usage guide](guide.md) walks through three realistic scenarios.
 
 ## Operations
 
@@ -181,6 +181,7 @@ Three specification files document the details:
 | [Specification](spec.md) | Core operations, pattern matching, access control, TTL, blocking, limits |
 | [HTTP API](http-spec.md) | Endpoints, request/response formats, error codes |
 | [CLI reference](cli-spec.md) | Subcommands, flags, stdin behavior |
+| [Usage guide](guide.md) | Worked examples: software development, research, business workflows |
 
 ## Dependencies
 
