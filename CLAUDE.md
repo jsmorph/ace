@@ -25,6 +25,8 @@ When writing documents, you should edit yourself like a serious author
 with an old-school editor at The New Yorker.  Think like John McPhee
 perhaps.
 
+Use the Oxford comma obviously.
+
 **Absolutely no gratuitous or obvious comments in code or elsewhere.**
 
 Keep things as simple as possible.  Simplicity and clarify are the

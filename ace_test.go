@@ -420,6 +420,50 @@ func TestCanonicalizationPreservesHTMLChars(t *testing.T) {
 	}
 }
 
+func TestCascadeDeleteOnExpire(t *testing.T) {
+	s := newTestSpace(t)
+
+	acc := &Access{In: []string{"w1"}, Rd: []string{"r1"}}
+	_, err := s.Out(json.RawMessage(`{"a":1,"b":2}`), acc, time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = s.Out(json.RawMessage(`{"c":3}`), nil, time.Millisecond)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// This one survives.
+	_, err = s.Out(json.RawMessage(`{"d":4}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	deleted, err := s.DeleteExpired()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 deleted, got %d", deleted)
+	}
+
+	st, err := s.Stats()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Objects != 1 {
+		t.Fatalf("expected 1 object, got %d", st.Objects)
+	}
+	if st.Branches != 1 {
+		t.Fatalf("expected 1 branch, got %d", st.Branches)
+	}
+	if st.AccessRecords != 0 {
+		t.Fatalf("expected 0 access records, got %d", st.AccessRecords)
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }

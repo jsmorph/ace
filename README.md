@@ -6,7 +6,7 @@ ACE is a coordination service for software agents. It implements a tuple space: 
 
 ACE provides three operations borrowed from the tuple-space tradition.
 
-`out(object, access, ttl)` writes an object into the space. The optional `access` and `ttl` parameters are described below.
+`out(object, access, ttl)` writes an object into the space.
 
 `in(pattern, wait, since)` finds and removes the earliest object matching the pattern. If no match exists and `wait` is greater than zero, the call blocks for up to that many seconds. The optional `since` parameter skips objects with timestamps at or before the given value, enabling cursor-style iteration.
 
@@ -109,10 +109,10 @@ ace test --writers 8 --readers 8 --requests 200
 | POST | `/out` | Write an object |
 | POST | `/in` | Read and remove a matching object |
 | POST | `/rd` | Read a matching object |
-| GET | `/limits` | Return current service limits |
-| GET | `/stats` | Return database statistics |
+| GET | `/limits` | Return active limits |
+| GET | `/stats` | Return storage statistics |
 
-The `/in` and `/rd` request body accepts `pattern` (required), `wait` (seconds, default 0), and `since` (timestamp, optional). When no object matches, the response body is `null` with status 200.
+See `http-spec.md` for request/response formats and error codes.
 
 ## Access control
 
@@ -123,7 +123,7 @@ curl -X POST http://localhost:8000/out \
   -d '{"object":{"type":"task","payload":"compute"},"access":{"in":["worker-1"],"rd":["monitor"]}}'
 ```
 
-This object can only be consumed (`in`) by `worker-1` and only be read (`rd`) by `monitor`. Callers identify themselves with the `X-ACE-ID` header (or `--id` on the CLI):
+Only `worker-1` can consume this object (`in`) and only `monitor` can read it (`rd`). Callers identify themselves with the `X-ACE-ID` header (or `--id` on the CLI):
 
 ```
 curl -X POST http://localhost:8000/in \
@@ -133,41 +133,13 @@ curl -X POST http://localhost:8000/in \
 
 If an object has no `access` parameter, any caller can read or consume it regardless of whether `X-ACE-ID` is present. If an object has an `access.in` list, only callers whose `X-ACE-ID` appears in that list can consume it. The `access.rd` list works the same way for `rd`.
 
-The optional `ttl` parameter on `out` sets the object's lifetime as an ISO 8601 duration (e.g., `P3D` for three days, `PT2H` for two hours). The default is 72 hours.
+## TTL
+
+The optional `ttl` parameter on `out` sets the object's lifetime as an ISO 8601 duration (e.g., `P3D` for three days, `PT2H` for two hours). The default is 72 hours. Expired objects become invisible to `in` and `rd`.
 
 ## Configuration
 
-The `serve` command accepts these flags:
-
-| Flag | Default | Purpose |
-|------|---------|---------|
-| `--port` | `localhost:8000` | Listen address |
-| `--db` | `ace.db` | SQLite database file |
-| `--limits` | (none) | JSON file overriding default limits |
-| `--blocking` | `notify` | Blocking implementation: `polling` or `notify` |
-| `--scavenge` | `PT1H` | Interval for deleting expired objects (ISO 8601) |
-| `--max-waiters` | 0 | Max concurrent blocking clients; 0 means unlimited |
-
-When the number of blocked clients reaches `--max-waiters`, new blocking requests receive HTTP 503.
-
-### Limits
-
-These limits apply to every operation. Override them by passing a JSON file to `--limits`.
-
-| Property | Default |
-|----------|---------|
-| Object size | 2048 bytes |
-| Property name size | 64 bytes |
-| Object value size | 128 bytes |
-| Object leaves | 8 |
-| Pattern size | 2048 bytes |
-| Pattern leaves | 4 |
-| Pattern array length | 4 |
-| Pattern atomic leaf size | 128 bytes |
-| Access size | 1024 bytes |
-| Access identifiers | 16 |
-| TTL maximum | 7 days |
-| Caller ID size | 128 bytes |
+See `cli-spec.md` for the full set of flags. The server accepts `--blocking` (`polling` or `notify`), `--scavenge` (expiration interval), `--max-waiters` (concurrent blocking client limit), and `--limits` (JSON file overriding default limits). See `spec.md` for the list of limits and their defaults.
 
 ## Background
 
@@ -183,6 +155,24 @@ AWS EventBridge routes events by matching their JSON content against patterns th
 
 Peter Norvig's `patmatch` (from *Paradigms of Artificial Intelligence Programming*, 1992) showed that a small pattern language with a few composable operations (literal match, variables, segment variables) expresses non-trivial matching concisely. ACE's pattern language is far simpler: no unification, no variables, no backtracking. But it follows the same principle that matching against structure is more natural and more composable than matching against serialized strings.
 
+## Specifications
+
+Three specification files document the details:
+
+| Document | Scope |
+|----------|-------|
+| `spec.md` | Core operations, pattern matching, access control, TTL, blocking, limits |
+| `http-spec.md` | HTTP API endpoints, request/response formats, error codes |
+| `cli-spec.md` | CLI subcommands, flags, stdin behavior |
+
 ## Dependencies
 
 ACE has two external dependencies. [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) is a pure-Go SQLite implementation (no CGo). [Quamina](https://pkg.go.dev/quamina.net/go/quamina) provides content-based pattern matching for blocking notifications.
+
+## References
+
+- [Quamina](https://github.com/timbray/quamina): Content-based pattern matching for JSON events. Tim Bray's open-source implementation of the approach used by AWS EventBridge.
+- [Quamina API documentation](https://pkg.go.dev/quamina.net/go/quamina)
+- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite): Pure-Go SQLite implementation.
+- David Gelernter, [Generative Communication in Linda](https://dl.acm.org/doi/10.1145/2363.2433), ACM TOPLAS, 1985. The original tuple-space paper.
+- Peter Norvig, *Paradigms of Artificial Intelligence Programming*, 1992. Chapter 6 describes `patmatch`.

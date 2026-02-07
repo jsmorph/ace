@@ -13,3 +13,6 @@ test:
 
 stress:
 	go run ./cmd/ace test
+
+install:
+	cd cmd/ace && go install

@@ -313,10 +313,13 @@ func (s *Space) poll(ctx context.Context, queryFn func() (*Result, error), deadl
 	}
 }
 
-func (s *Space) DeleteExpired() error {
+func (s *Space) DeleteExpired() (int64, error) {
 	now := time.Now().UTC().Format(idFormat)
-	_, err := s.db.Exec("DELETE FROM objects WHERE expires <= ?", now)
-	return err
+	res, err := s.db.Exec("DELETE FROM objects WHERE expires <= ?", now)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
 }
 
 func canonicalize(raw json.RawMessage) (json.RawMessage, error) {
@@ -336,6 +339,7 @@ func canonicalize(raw json.RawMessage) (json.RawMessage, error) {
 
 type Stats struct {
 	Objects           int     `json:"objects"`
+	Expired           int     `json:"expired"`
 	Branches          int     `json:"branches"`
 	AccessRecords     int     `json:"access_records"`
 	AvgBranchLength   float64 `json:"avg_branch_length"`
@@ -349,6 +353,10 @@ func (s *Space) Stats() (*Stats, error) {
 
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects").Scan(&st.Objects); err != nil {
 		return nil, fmt.Errorf("count objects: %w", err)
+	}
+	now := time.Now().UTC().Format(idFormat)
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects WHERE expires <= ?", now).Scan(&st.Expired); err != nil {
+		return nil, fmt.Errorf("count expired: %w", err)
 	}
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM branches").Scan(&st.Branches); err != nil {
 		return nil, fmt.Errorf("count branches: %w", err)
