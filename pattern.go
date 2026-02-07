@@ -25,6 +25,9 @@ func ExtractPatternBranches(data []byte) ([]PatternBranch, error) {
 
 func extractPatternFromObject(obj map[string]interface{}, path []string, out *[]PatternBranch) error {
 	for k, v := range obj {
+		if strings.HasPrefix(k, "#") {
+			return fmt.Errorf("pattern property %q starts with #; metadata properties are not matchable", k)
+		}
 		p := append(path, escapeProperty(k))
 		switch val := v.(type) {
 		case map[string]interface{}:

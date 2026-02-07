@@ -23,7 +23,7 @@ Request body:
 
 ```json
 {
-  "object": {"type": "task", "payload": "compute"},
+  "object": {"#id": "job-42", "type": "task", "payload": "compute"},
   "access": {"in": ["worker-1"], "rd": ["monitor"]},
   "ttl": "P1D"
 }
@@ -31,7 +31,7 @@ Request body:
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `object` | yes | JSON object to store |
+| `object` | yes | JSON object to store (properties starting with `#` are metadata: stored but not matchable; see `spec.md`) |
 | `access` | no | Access control (see `spec.md`) |
 | `ttl` | no | Time-to-live as ISO 8601 duration (default: 72 hours) |
 
@@ -64,13 +64,15 @@ Request body:
 Response when a match exists (200):
 
 ```json
-{"id": "2025-07-14T22:31:05.123456789", "object": {"type": "task", "payload": "compute"}}
+{"id": "2025-07-14T22:31:05.123456789", "object": {"#id": "job-42", "type": "task", "payload": "compute"}}
 ```
+
+Metadata properties (like `#id`) are returned in the object even though they do not participate in pattern matching.
 
 When explicit deletes are enabled, the response includes a `delete_id`:
 
 ```json
-{"id": "2025-07-14T22:31:05.123456789", "object": {"type": "task", "payload": "compute"}, "delete_id": "a1b2c3d4e5f6..."}
+{"id": "2025-07-14T22:31:05.123456789", "object": {"#id": "job-42", "type": "task", "payload": "compute"}, "delete_id": "a1b2c3d4e5f6..."}
 ```
 
 Response when no match exists (200):

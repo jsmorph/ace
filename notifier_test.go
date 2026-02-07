@@ -66,6 +66,24 @@ func TestToQuaminaPatternEmpty(t *testing.T) {
 	}
 }
 
+func TestToQuaminaPatternSkipsHashProperty(t *testing.T) {
+	out, err := ToQuaminaPattern(json.RawMessage(`{"#meta":"x","a":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var obj map[string]interface{}
+	if err := json.Unmarshal(out, &obj); err != nil {
+		t.Fatal(err)
+	}
+	if _, found := obj["#meta"]; found {
+		t.Fatal("expected #meta to be stripped from Quamina pattern")
+	}
+	arr, ok := obj["a"].([]interface{})
+	if !ok || len(arr) != 1 {
+		t.Fatalf("expected {a:[1]}, got %v", obj)
+	}
+}
+
 func TestNotifierRegisterAndNotify(t *testing.T) {
 	n, err := NewNotifier()
 	if err != nil {

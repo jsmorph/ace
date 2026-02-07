@@ -21,6 +21,9 @@ func ExtractBranches(data []byte) ([]string, error) {
 
 func extractFromObject(obj map[string]interface{}, path []string, out *[]string) error {
 	for k, v := range obj {
+		if strings.HasPrefix(k, "#") {
+			continue
+		}
 		p := append(path, escapeProperty(k))
 		switch val := v.(type) {
 		case map[string]interface{}:

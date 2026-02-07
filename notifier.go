@@ -3,6 +3,7 @@ package ace
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -96,6 +97,9 @@ func ToQuaminaPattern(acePattern json.RawMessage) (json.RawMessage, error) {
 func convertToQuamina(obj map[string]interface{}) map[string]interface{} {
 	result := make(map[string]interface{}, len(obj))
 	for k, v := range obj {
+		if strings.HasPrefix(k, "#") {
+			continue
+		}
 		switch val := v.(type) {
 		case map[string]interface{}:
 			result[k] = convertToQuamina(val)

@@ -76,6 +76,14 @@ A limit of 0 disables monitoring. High latency is informational, not an error. T
 
 Lines 101-102 of `spec.md` reference `access.out`, but the API definition (lines 55-58) defines the access fields as `in` and `rd`. The implementation uses `in` and `rd`.
 
+## Metadata Properties (`#` prefix)
+
+Properties whose names start with `#` are opaque metadata. They are stored in the object JSON and returned to callers but excluded from all matching. The filter is applied in three places: `extractFromObject` (branch.go), `extractPatternFromObject` (pattern.go), and `convertToQuamina` (notifier.go). Each skips `#`-prefixed keys at every recursion level.
+
+`#` properties in patterns are rejected as errors because there are no branches to match against. `walkObject` (limits.go) also skips `#` properties so they don't count against the object leaf limit, while `walkPattern` rejects them.
+
+Quamina's `MatchesForEvent` receives the full object JSON (including `#` fields). Since registered patterns never reference `#` fields, Quamina ignores them. No filtering is needed on the notification object path.
+
 ## Decisions
 
 **No arrays in object values.** The spec's branch model only defines matching for atomic leaves. An object with an array value (like `{"a":[1,2]}`) has no well-defined branch encoding. Validation rejects arrays in objects.

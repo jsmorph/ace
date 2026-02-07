@@ -98,6 +98,26 @@ func TestExtractBranchesNumberNormalization(t *testing.T) {
 	}
 }
 
+func TestExtractBranchesSkipsHashProperty(t *testing.T) {
+	branches, err := ExtractBranches([]byte(`{"#meta":"x","a":1}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(branches) != 1 || branches[0] != "a=1" {
+		t.Fatalf("expected [a=1], got %v", branches)
+	}
+}
+
+func TestExtractBranchesSkipsNestedHashProperty(t *testing.T) {
+	branches, err := ExtractBranches([]byte(`{"a":{"#inner":"x","b":1}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(branches) != 1 || branches[0] != "a.b=1" {
+		t.Fatalf("expected [a.b=1], got %v", branches)
+	}
+}
+
 func TestExtractBranchesEmpty(t *testing.T) {
 	branches, err := ExtractBranches([]byte(`{}`))
 	if err != nil {

@@ -4,7 +4,7 @@ ACE is a coordination service for software agents, built on the tuple-space mode
 
 ## Objects
 
-An object is a JSON value of type "object" (a set of name-value pairs). Values may be strings, numbers, booleans, null, or nested objects. Object values may not be arrays.
+An object is a JSON value of type "object" (a set of name-value pairs). Values may be strings, numbers, booleans, null, or nested objects. Object values may not be arrays. Properties whose names start with `#` are metadata: stored and returned but excluded from matching (see Metadata Properties).
 
 ACE stores objects in canonical form: keys in lexicographic order, no HTML escaping. Two JSON objects that differ only in key order or whitespace produce the same canonical representation.
 
@@ -88,6 +88,20 @@ An array in a pattern means "any of these values." Extra fields in the object do
 
 The last row fails because the pattern requires `"d":3` at the top level, but the object contains `"d":3` only inside `"a"`.
 
+## Metadata properties
+
+A property whose name starts with `#` is a metadata property. Metadata properties are stored in the object and returned to callers, but they are invisible to pattern matching: no branches are generated for them, and they do not count against the object leaf limit.
+
+The filter applies at every nesting level. In `{"a":{"#note":"x","b":1}}`, the `#note` property is metadata regardless of its position; only `a.b` participates in matching. A top-level `#` property like `{"#id":"abc","type":"task"}` skips the entire subtree rooted at that key.
+
+A `#` property in a pattern is an error. Because metadata properties generate no branches, a pattern that references one can never add useful constraints.
+
+| Object | Pattern | Result |
+|--------|---------|--------|
+| `{"#tag":"debug","type":"task"}` | `{"type":"task"}` | match |
+| `{"#tag":"debug","type":"task"}` | `{}` | match |
+| `{"#tag":"debug","type":"task"}` | `{"#tag":"debug"}` | error |
+
 ## Access control
 
 The `access` parameter on `out` restricts which callers may retrieve an object. It contains two optional fields:
@@ -156,4 +170,4 @@ These limits constrain every operation. A violation produces an error that state
 | TTL maximum | 7 days |
 | Caller ID size | 128 bytes |
 
-An object leaf is a scalar value at any nesting depth. A pattern leaf is a single constraint: a scalar is one leaf, and an array of alternatives is one leaf.
+An object leaf is a scalar value at any nesting depth. A pattern leaf is a single constraint: a scalar is one leaf, and an array of alternatives is one leaf. Metadata properties (names starting with `#`) do not count as leaves.

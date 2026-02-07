@@ -3,6 +3,7 @@ package ace
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -59,6 +60,9 @@ func (l Limits) ValidateObject(raw []byte) error {
 func (l Limits) walkObject(obj map[string]interface{}, path string) (int, error) {
 	leaves := 0
 	for k, v := range obj {
+		if strings.HasPrefix(k, "#") {
+			continue
+		}
 		if len(k) > l.PropertySize {
 			return 0, fmt.Errorf("property name %q is %d > %d bytes", k, len(k), l.PropertySize)
 		}
@@ -110,6 +114,9 @@ func (l Limits) ValidatePattern(raw []byte) error {
 func (l Limits) walkPattern(obj map[string]interface{}, path string) (int, error) {
 	leaves := 0
 	for k, v := range obj {
+		if strings.HasPrefix(k, "#") {
+			return 0, fmt.Errorf("pattern property %q starts with #; metadata properties are not matchable", k)
+		}
 		if len(k) > l.PropertySize {
 			return 0, fmt.Errorf("property name %q is %d > %d bytes", k, len(k), l.PropertySize)
 		}

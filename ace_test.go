@@ -1259,6 +1259,130 @@ func TestDBOperationTimeMonitorDisabled(t *testing.T) {
 	}
 }
 
+func TestHashPropertyIgnoredInMatching(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	id, err := s.Out(json.RawMessage(`{"#tag":"debug","type":"task"}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := s.Rd(ctx, "", json.RawMessage(`{"type":"task"}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil || r.ID != id {
+		t.Fatal("expected match on non-# property")
+	}
+}
+
+func TestHashPropertyPreservedInOutput(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	_, err := s.Out(json.RawMessage(`{"#tag":"debug","type":"task"}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := s.Rd(ctx, "", json.RawMessage(`{"type":"task"}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil {
+		t.Fatal("expected result")
+	}
+
+	var obj map[string]interface{}
+	if err := json.Unmarshal(r.Object, &obj); err != nil {
+		t.Fatal(err)
+	}
+	if obj["#tag"] != "debug" {
+		t.Fatalf("expected #tag preserved in output, got %v", obj)
+	}
+}
+
+func TestHashPropertyNestedIgnored(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	id, err := s.Out(json.RawMessage(`{"a":{"#meta":"x","b":1}}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	r, err := s.Rd(ctx, "", json.RawMessage(`{"a":{"b":1}}`), 0, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r == nil || r.ID != id {
+		t.Fatal("expected match ignoring nested # property")
+	}
+}
+
+func TestHashPropertyNotifyMode(t *testing.T) {
+	s := newTestSpaceWithConfig(t, notifyConfig())
+	ctx := context.Background()
+
+	done := make(chan *Result, 1)
+	go func() {
+		r, err := s.In(ctx, "", json.RawMessage(`{"type":"task"}`), 2*time.Second, "")
+		if err != nil {
+			t.Errorf("in: %v", err)
+			return
+		}
+		done <- r
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	_, err := s.Out(json.RawMessage(`{"#id":"abc","type":"task"}`), nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case r := <-done:
+		if r == nil {
+			t.Fatal("expected result")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out")
+	}
+}
+
+func TestHashPropertyInPatternRejected(t *testing.T) {
+	s := newTestSpace(t)
+	ctx := context.Background()
+
+	_, err := s.Rd(ctx, "", json.RawMessage(`{"#tag":"debug"}`), 0, "")
+	if err == nil {
+		t.Fatal("expected error for # property in pattern")
+	}
+	if !strings.Contains(err.Error(), "metadata properties are not matchable") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestHashPropertyDoesNotCountAgainstLimit(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Blocking = BlockingPoll
+	cfg.Limits.ObjectLeaves = 1
+	s := newTestSpaceWithConfig(t, cfg)
+
+	// #tag is metadata, only "a" counts: 1 leaf, within limit.
+	_, err := s.Out(json.RawMessage(`{"#tag":"debug","a":1}`), nil, 0)
+	if err != nil {
+		t.Fatalf("expected success with 1 real leaf, got: %v", err)
+	}
+
+	// Two real leaves exceed the limit.
+	_, err = s.Out(json.RawMessage(`{"a":1,"b":2}`), nil, 0)
+	if err == nil {
+		t.Fatal("expected leaf limit error")
+	}
+}
+
 func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
