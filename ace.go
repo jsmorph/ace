@@ -1,0 +1,389 @@
+package ace
+
+import (
+	"bytes"
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+const defaultTTL = 72 * time.Hour
+
+type Space struct {
+	db       *sql.DB
+	idgen    *IDGen
+	cfg      Config
+	notifier *Notifier
+	stop     chan struct{}
+}
+
+type Result struct {
+	ID     string          `json:"id"`
+	Object json.RawMessage `json:"object"`
+}
+
+func NewSpace(dbPath string, cfg Config) (*Space, error) {
+	switch cfg.Blocking {
+	case BlockingPoll, BlockingNotify:
+	default:
+		return nil, fmt.Errorf("unrecognized blocking mode: %q", cfg.Blocking)
+	}
+
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", dbPath)
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open database: %w", err)
+	}
+	db.SetMaxOpenConns(1)
+
+	if err := initSchema(db); err != nil {
+		return nil, errors.Join(fmt.Errorf("init schema: %w", err), db.Close())
+	}
+
+	s := &Space{
+		db:    db,
+		idgen: NewIDGen(),
+		cfg:   cfg,
+		stop:  make(chan struct{}),
+	}
+
+	if cfg.Blocking == BlockingNotify {
+		n, err := NewNotifier()
+		if err != nil {
+			return nil, errors.Join(fmt.Errorf("create notifier: %w", err), db.Close())
+		}
+		s.notifier = n
+	}
+
+	return s, nil
+}
+
+func (s *Space) Close() error {
+	close(s.stop)
+	return s.db.Close()
+}
+
+func (s *Space) Limits() Limits {
+	return s.cfg.Limits
+}
+
+func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (retID string, retErr error) {
+	if ttl == 0 {
+		ttl = defaultTTL
+	}
+
+	canonical, err := canonicalize(object)
+	if err != nil {
+		return "", fmt.Errorf("canonicalize: %w", err)
+	}
+	object = canonical
+
+	if err := s.cfg.Limits.ValidateTTL(ttl); err != nil {
+		return "", err
+	}
+	if err := s.cfg.Limits.ValidateObject(object); err != nil {
+		return "", err
+	}
+	if access != nil {
+		raw, err := json.Marshal(access)
+		if err != nil {
+			return "", fmt.Errorf("marshal access: %w", err)
+		}
+		if err := s.cfg.Limits.ValidateAccess(raw); err != nil {
+			return "", err
+		}
+	}
+
+	branches, err := ExtractBranches(object)
+	if err != nil {
+		return "", fmt.Errorf("extract branches: %w", err)
+	}
+
+	id := s.idgen.Next()
+	expires := time.Now().UTC().Add(ttl).Format(idFormat)
+	jsonStr := string(object)
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return "", fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			retErr = errors.Join(retErr, fmt.Errorf("rollback: %w", err))
+		}
+	}()
+
+	if _, err := tx.Exec("INSERT INTO objects (id, json, expires) VALUES (?, ?, ?)", id, jsonStr, expires); err != nil {
+		return "", fmt.Errorf("insert object: %w", err)
+	}
+
+	if access != nil {
+		for _, iid := range access.In {
+			if _, err := tx.Exec("INSERT INTO access (id, type, iid) VALUES (?, 'in', ?)", id, iid); err != nil {
+				return "", fmt.Errorf("insert access in: %w", err)
+			}
+		}
+		for _, iid := range access.Rd {
+			if _, err := tx.Exec("INSERT INTO access (id, type, iid) VALUES (?, 'rd', ?)", id, iid); err != nil {
+				return "", fmt.Errorf("insert access rd: %w", err)
+			}
+		}
+	}
+
+	for _, b := range branches {
+		if _, err := tx.Exec("INSERT INTO branches (id, b) VALUES (?, ?)", id, b); err != nil {
+			return "", fmt.Errorf("insert branch: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return "", fmt.Errorf("commit: %w", err)
+	}
+
+	if s.notifier != nil {
+		if err := s.notifier.Notify(object); err != nil {
+			return id, fmt.Errorf("notify: %w", err)
+		}
+	}
+
+	return id, nil
+}
+
+func (s *Space) In(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string) (*Result, error) {
+	return s.fetch(ctx, callerID, pattern, wait, since, "in", true)
+}
+
+func (s *Space) Rd(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string) (*Result, error) {
+	return s.fetch(ctx, callerID, pattern, wait, since, "rd", false)
+}
+
+func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMessage, wait time.Duration, since string, accessType string, remove bool) (*Result, error) {
+	if err := s.cfg.Limits.ValidatePattern(pattern); err != nil {
+		return nil, err
+	}
+	if err := s.cfg.Limits.ValidateCallerID(callerID); err != nil {
+		return nil, err
+	}
+
+	pbs, err := ExtractPatternBranches(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("extract pattern branches: %w", err)
+	}
+
+	queryFn := func() (*Result, error) {
+		return s.executeMatch(pbs, accessType, callerID, since, remove)
+	}
+
+	result, err := queryFn()
+	if err != nil {
+		return nil, err
+	}
+	if result != nil || wait <= 0 {
+		return result, nil
+	}
+
+	if s.notifier != nil {
+		return s.waitNotify(ctx, pattern, queryFn, time.Now().Add(wait))
+	}
+	return s.poll(ctx, queryFn, time.Now().Add(wait))
+}
+
+func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
+	query, args := BuildMatchQuery(pbs, accessType, callerID, since, time.Now())
+
+	if !remove {
+		var id, jsonStr string
+		err := s.db.QueryRow(query, args...).Scan(&id, &jsonStr)
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		if err != nil {
+			return nil, fmt.Errorf("query: %w", err)
+		}
+		return &Result{ID: id, Object: json.RawMessage(jsonStr)}, nil
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			retErr = errors.Join(retErr, fmt.Errorf("rollback: %w", err))
+		}
+	}()
+
+	var id, jsonStr string
+	err = tx.QueryRow(query, args...).Scan(&id, &jsonStr)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("query: %w", err)
+	}
+
+	if _, err := tx.Exec("DELETE FROM objects WHERE id = ?", id); err != nil {
+		return nil, fmt.Errorf("delete object: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit: %w", err)
+	}
+
+	return &Result{ID: id, Object: json.RawMessage(jsonStr)}, nil
+}
+
+func (s *Space) waitNotify(ctx context.Context, pattern json.RawMessage, queryFn func() (*Result, error), deadline time.Time) (*Result, error) {
+	wid, ch, err := s.notifier.Register(pattern)
+	if err != nil {
+		return nil, fmt.Errorf("register notification: %w", err)
+	}
+	defer s.notifier.Deregister(wid)
+
+	result, err := queryFn()
+	if err != nil {
+		return nil, err
+	}
+	if result != nil {
+		return result, nil
+	}
+
+	timer := time.NewTimer(time.Until(deadline))
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ch:
+			result, err := queryFn()
+			if err != nil {
+				return nil, err
+			}
+			if result != nil {
+				return result, nil
+			}
+		case <-timer.C:
+			return nil, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-s.stop:
+			return nil, nil
+		}
+	}
+}
+
+func (s *Space) poll(ctx context.Context, queryFn func() (*Result, error), deadline time.Time) (*Result, error) {
+	intervals := []time.Duration{
+		50 * time.Millisecond,
+		100 * time.Millisecond,
+		200 * time.Millisecond,
+		500 * time.Millisecond,
+	}
+	idx := 0
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, nil
+		}
+		delay := intervals[idx]
+		if idx < len(intervals)-1 {
+			idx++
+		}
+		if delay > remaining {
+			delay = remaining
+		}
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-s.stop:
+			return nil, nil
+		}
+		result, err := queryFn()
+		if err != nil {
+			return nil, err
+		}
+		if result != nil {
+			return result, nil
+		}
+	}
+}
+
+func (s *Space) DeleteExpired() error {
+	now := time.Now().UTC().Format(idFormat)
+	_, err := s.db.Exec("DELETE FROM objects WHERE expires <= ?", now)
+	return err
+}
+
+func canonicalize(raw json.RawMessage) (json.RawMessage, error) {
+	var obj map[string]interface{}
+	if err := json.Unmarshal(raw, &obj); err != nil {
+		return nil, err
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(obj); err != nil {
+		return nil, err
+	}
+	b := buf.Bytes()
+	return b[:len(b)-1], nil // Encode appends a newline
+}
+
+type Stats struct {
+	Objects           int     `json:"objects"`
+	Branches          int     `json:"branches"`
+	AccessRecords     int     `json:"access_records"`
+	AvgBranchLength   float64 `json:"avg_branch_length"`
+	AvgBranchesPerObj float64 `json:"avg_branches_per_object"`
+	AvgAccessIn       float64 `json:"avg_access_in_per_object"`
+	AvgAccessRd       float64 `json:"avg_access_rd_per_object"`
+}
+
+func (s *Space) Stats() (*Stats, error) {
+	var st Stats
+
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects").Scan(&st.Objects); err != nil {
+		return nil, fmt.Errorf("count objects: %w", err)
+	}
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM branches").Scan(&st.Branches); err != nil {
+		return nil, fmt.Errorf("count branches: %w", err)
+	}
+	if err := s.db.QueryRow("SELECT COUNT(*) FROM access").Scan(&st.AccessRecords); err != nil {
+		return nil, fmt.Errorf("count access: %w", err)
+	}
+
+	if st.Branches > 0 {
+		if err := s.db.QueryRow("SELECT AVG(LENGTH(b)) FROM branches").Scan(&st.AvgBranchLength); err != nil {
+			return nil, fmt.Errorf("avg branch length: %w", err)
+		}
+	}
+
+	if st.Objects > 0 {
+		if err := s.db.QueryRow("SELECT AVG(cnt) FROM (SELECT COUNT(*) as cnt FROM branches GROUP BY id)").Scan(&st.AvgBranchesPerObj); err != nil {
+			return nil, fmt.Errorf("avg branches per object: %w", err)
+		}
+
+		var avgIn sql.NullFloat64
+		if err := s.db.QueryRow("SELECT CAST(COUNT(*) AS REAL) / ? FROM access WHERE type = 'in'", st.Objects).Scan(&avgIn); err != nil {
+			return nil, fmt.Errorf("avg access in: %w", err)
+		}
+		if avgIn.Valid {
+			st.AvgAccessIn = avgIn.Float64
+		}
+
+		var avgRd sql.NullFloat64
+		if err := s.db.QueryRow("SELECT CAST(COUNT(*) AS REAL) / ? FROM access WHERE type = 'rd'", st.Objects).Scan(&avgRd); err != nil {
+			return nil, fmt.Errorf("avg access rd: %w", err)
+		}
+		if avgRd.Valid {
+			st.AvgAccessRd = avgRd.Float64
+		}
+	}
+
+	return &st, nil
+}
