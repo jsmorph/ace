@@ -189,6 +189,21 @@ Three specification files document the details:
 
 ACE has two external dependencies. [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) is a pure-Go SQLite implementation (no CGo). [Quamina](https://pkg.go.dev/quamina.net/go/quamina) provides content-based pattern matching for blocking notifications.
 
+## Roadmap
+
+- [ ] Support updating visibility timeout for an emitted object (as in
+      SQS).
+ 
+- [ ] Server-sent events to deliver multiple objects asynchronously
+      for `in` and `rd` operations if requested.
+
+- [ ] Maybe? Modify `ace in` to accept `--n N`, which gets `N`
+      objects, each of which is written on its own line to `stdout`.
+      Similarly for `ace rd`.
+
+- [ ] Probably not: Support unification in pattern matching.
+
+
 ## References
 
 1. David Gelernter, [Generative Communication in Linda](https://dl.acm.org/doi/10.1145/2363.2433), ACM TOPLAS, 1985. The original tuple-space paper.

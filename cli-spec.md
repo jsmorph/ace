@@ -4,6 +4,8 @@ This document specifies the `ace` command-line interface. See `spec.md` for the 
 
 All subcommands accept `--db` (default: `ace.db`) to specify the SQLite database file.
 
+The `out`, `in`, `rd`, `del`, and `stats` subcommands accept `--server` to specify an ACE server URL (e.g., `http://localhost:8000`). If `--server` is not given, the `$ACE_URL` environment variable is used when set. When a server URL is active, the command sends HTTP requests to the server instead of opening a local database, and `--db` is ignored.
+
 ## ace serve
 
 Start the HTTP server.
@@ -27,6 +29,7 @@ Write an object into the space. If `--object` is given, write that single object
 
 | Flag | Default | Purpose |
 |------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
 | `--object` | (stdin) | JSON object |
 | `--access` | (none) | Access control JSON |
 | `--ttl` | (none) | TTL as ISO 8601 duration |
@@ -39,16 +42,18 @@ Each object produces one line of output:
 
 ## ace in
 
-Find and remove the earliest matching object without blocking.
+Find and remove the earliest matching object.
 
 | Flag | Default | Purpose |
 |------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
 | `--pattern` | (stdin) | JSON pattern |
 | `--since` | (none) | Return only objects after this identifier |
 | `--id` | (none) | Caller identity for access control |
+| `--wait` | (none) | Block duration (ISO 8601 or Go duration, e.g. `PT10S` or `10s`) |
 | `--deletes` | false | Enable explicit deletes |
 
-If `--pattern` is absent or `-`, the command reads the pattern from stdin. Output is a JSON result or `null` if no match exists. When `--deletes` is set, the result includes a `delete_id` field.
+If `--pattern` is absent or `-`, the command reads the pattern from stdin. Output is a JSON result or `null` if no match exists. If `--wait` is set and no match exists immediately, the command blocks until a match appears or the deadline passes. When `--deletes` is set, the result includes a `delete_id` field.
 
 ## ace rd
 
@@ -75,6 +80,7 @@ Confirm deletion of an object previously returned by `ace in --deletes`. See `sp
 
 | Flag | Default | Purpose |
 |------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
 | `--delete-id` | (required) | Deletion ID returned by `ace in` |
 
 Output:
@@ -86,6 +92,10 @@ Output:
 ## ace stats
 
 Print storage statistics as JSON. See `http-spec.md` for the fields.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
 
 ## ace expire
 
