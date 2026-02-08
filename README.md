@@ -280,6 +280,7 @@ up to execute their queries.
 | [HTTP API](http-spec.md) | Endpoints, request/response formats |
 | [CLI reference](cli-spec.md) | Subcommands, flags, stdin behavior |
 | [Usage guide](guide.md) | Worked examples for three scenarios |
+| [Related systems](related.md) | Real-world analogs to the tuple-space model |
 
 ## Dependencies
 
