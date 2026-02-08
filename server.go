@@ -99,7 +99,9 @@ func (srv *Server) handleOut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, outResponse{ID: id})
+	if err := writeJSON(w, http.StatusOK, outResponse{ID: id}); err != nil {
+		log.Printf("handleOut: write response: %v", err)
+	}
 }
 
 func (srv *Server) handleIn(w http.ResponseWriter, r *http.Request) {
@@ -157,10 +159,14 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 	}
 
 	if result == nil {
-		writeJSON(w, http.StatusOK, nil)
+		if err := writeJSON(w, http.StatusOK, nil); err != nil {
+			log.Printf("handleMatch: write null response: %v", err)
+		}
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	if err := writeJSON(w, http.StatusOK, result); err != nil {
+		log.Printf("handleMatch: write response: %v", err)
+	}
 }
 
 type delRequest struct {
@@ -200,7 +206,9 @@ func (srv *Server) handleDel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, delResponse{Deleted: deleted})
+	if err := writeJSON(w, http.StatusOK, delResponse{Deleted: deleted}); err != nil {
+		log.Printf("handleDel: write response: %v", err)
+	}
 }
 
 func (srv *Server) handleLimits(w http.ResponseWriter, r *http.Request) {
@@ -208,7 +216,9 @@ func (srv *Server) handleLimits(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "GET required")
 		return
 	}
-	writeJSON(w, http.StatusOK, srv.space.Limits())
+	if err := writeJSON(w, http.StatusOK, srv.space.Limits()); err != nil {
+		log.Printf("handleLimits: write response: %v", err)
+	}
 }
 
 func (srv *Server) handleStats(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +231,9 @@ func (srv *Server) handleStats(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, stats)
+	if err := writeJSON(w, http.StatusOK, stats); err != nil {
+		log.Printf("handleStats: write response: %v", err)
+	}
 }
 
 type matchTestRequest struct {
@@ -271,7 +283,9 @@ func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, matchTestResponse{Match: ok})
+	if err := writeJSON(w, http.StatusOK, matchTestResponse{Match: ok}); err != nil {
+		log.Printf("handleMatchTest: write response: %v", err)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, code int, v interface{}) error {

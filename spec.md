@@ -37,7 +37,7 @@ over all objects.
 
 ## Operations
 
-ACE provides three operations.
+ACE provides four operations.
 
 ### out
 

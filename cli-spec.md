@@ -21,7 +21,7 @@ Start the HTTP server.
 
 | Flag | Default | Purpose |
 |------|---------|---------|
-| `--port` | `localhost:8000` | Listen address |
+| `--addr` | `localhost:8000` | Listen address |
 | `--db` | `ace.db` | Database file |
 | `--limits` | (none) | JSON file overriding default limits |
 | `--blocking` | `notify` | `polling` or `notify` |

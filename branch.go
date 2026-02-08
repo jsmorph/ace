@@ -25,7 +25,7 @@ func extractFromObject(obj map[string]interface{}, path []string, out *[]string)
 		if strings.HasPrefix(k, "#") {
 			continue
 		}
-		p := append(path, escapeProperty(k))
+		p := append(path[:len(path):len(path)], escapeProperty(k))
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if err := extractFromObject(val, p, out); err != nil {

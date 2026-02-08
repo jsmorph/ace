@@ -58,11 +58,11 @@ func (n *Notifier) Register(pattern json.RawMessage) (WaiterID, <-chan struct{},
 }
 
 // Deregister removes a previously registered pattern.
-func (n *Notifier) Deregister(id WaiterID) {
+func (n *Notifier) Deregister(id WaiterID) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	delete(n.waiters, id)
-	n.q.DeletePatterns(id)
+	return n.q.DeletePatterns(id)
 }
 
 // Notify tests an object against all registered patterns and signals matching waiters.

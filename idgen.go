@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const idFormat = "2006-01-02T15:04:05.000000000"
+const timestampFormat = "2006-01-02T15:04:05.000000000"
 
 // IDGen generates monotonically increasing nanosecond-resolution timestamp identifiers.
 type IDGen struct {
@@ -27,5 +27,5 @@ func (g *IDGen) Next() string {
 		now = g.last.Add(1)
 	}
 	g.last = now
-	return now.Format(idFormat)
+	return now.Format(timestampFormat)
 }

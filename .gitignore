@@ -1,4 +1,7 @@
-*~
 *.db
+*.db-wal
+*.db-shm
+*~
 ace
 task.md
+issues.md

@@ -117,7 +117,7 @@ go build -o ace ./cmd/ace
 Start a server:
 
 ```
-ace serve --port localhost:8000
+ace serve --addr localhost:8000
 ```
 
 Write an object:

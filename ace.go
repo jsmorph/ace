@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -25,6 +26,8 @@ type Space struct {
 	cfg      Config
 	notifier *Notifier
 	stop     chan struct{}
+	timerMu  sync.Mutex
+	timers   []*time.Timer
 }
 
 // Result holds an object returned by In or Rd.
@@ -74,7 +77,23 @@ func NewSpace(dbPath string, cfg Config) (*Space, error) {
 // Close shuts down the space and closes the database.
 func (s *Space) Close() error {
 	close(s.stop)
+	s.cancelTimers()
 	return s.db.Close()
+}
+
+func (s *Space) trackTimer(t *time.Timer) {
+	s.timerMu.Lock()
+	defer s.timerMu.Unlock()
+	s.timers = append(s.timers, t)
+}
+
+func (s *Space) cancelTimers() {
+	s.timerMu.Lock()
+	defer s.timerMu.Unlock()
+	for _, t := range s.timers {
+		t.Stop()
+	}
+	s.timers = nil
 }
 
 // Limits returns the active limits.
@@ -130,7 +149,7 @@ func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (
 	}
 
 	id := s.idgen.Next()
-	expires := time.Now().UTC().Add(ttl).Format(idFormat)
+	expires := time.Now().UTC().Add(ttl).Format(timestampFormat)
 	jsonStr := string(object)
 
 	tx, err := s.db.Begin()
@@ -273,7 +292,7 @@ func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID st
 		if err != nil {
 			return nil, fmt.Errorf("generate delete id: %w", err)
 		}
-		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(idFormat)
+		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(timestampFormat)
 		if _, err := tx.Exec("UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ?", did, invisibleUntil, id); err != nil {
 			return nil, fmt.Errorf("mark invisible: %w", err)
 		}
@@ -290,9 +309,15 @@ func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID st
 
 	if s.notifier != nil && result.DeleteID != "" {
 		obj := json.RawMessage(jsonStr)
-		time.AfterFunc(s.cfg.VisibilityTimeout, func() {
+		t := time.AfterFunc(s.cfg.VisibilityTimeout, func() {
+			select {
+			case <-s.stop:
+				return
+			default:
+			}
 			s.notifier.Notify(obj)
 		})
+		s.trackTimer(t)
 	}
 
 	return result, nil
@@ -303,7 +328,11 @@ func (s *Space) waitNotify(ctx context.Context, pattern json.RawMessage, queryFn
 	if err != nil {
 		return nil, fmt.Errorf("register notification: %w", err)
 	}
-	defer s.notifier.Deregister(wid)
+	defer func() {
+		if err := s.notifier.Deregister(wid); err != nil {
+			log.Printf("deregister waiter: %v", err)
+		}
+	}()
 
 	result, err := queryFn()
 	if err != nil {
@@ -380,7 +409,7 @@ func (s *Space) Del(deleteID string) (bool, error) {
 	if deleteID == "" {
 		return false, fmt.Errorf("delete_id is required")
 	}
-	now := time.Now().UTC().Format(idFormat)
+	now := time.Now().UTC().Format(timestampFormat)
 	res, err := s.db.Exec("DELETE FROM objects WHERE delete_id = ? AND invisible_until > ?", deleteID, now)
 	if err != nil {
 		return false, fmt.Errorf("delete: %w", err)
@@ -403,7 +432,7 @@ func generateDeleteID() (string, error) {
 // DeleteExpired removes all objects past their TTL and returns the count deleted.
 func (s *Space) DeleteExpired() (int64, error) {
 	defer s.logSlowOp("delete expired")()
-	now := time.Now().UTC().Format(idFormat)
+	now := time.Now().UTC().Format(timestampFormat)
 	res, err := s.db.Exec("DELETE FROM objects WHERE expires <= ?", now)
 	if err != nil {
 		return 0, err
@@ -449,7 +478,7 @@ func (s *Space) Stats() (*Stats, error) {
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects").Scan(&st.Objects); err != nil {
 		return nil, fmt.Errorf("count objects: %w", err)
 	}
-	now := time.Now().UTC().Format(idFormat)
+	now := time.Now().UTC().Format(timestampFormat)
 	if err := s.db.QueryRow("SELECT COUNT(*) FROM objects WHERE expires <= ?", now).Scan(&st.Expired); err != nil {
 		return nil, fmt.Errorf("count expired: %w", err)
 	}

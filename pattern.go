@@ -30,7 +30,7 @@ func extractPatternFromObject(obj map[string]interface{}, path []string, out *[]
 		if strings.HasPrefix(k, "#") {
 			return fmt.Errorf("pattern property %q starts with #; metadata properties are not matchable", k)
 		}
-		p := append(path, escapeProperty(k))
+		p := append(path[:len(path):len(path)], escapeProperty(k))
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if err := extractPatternFromObject(val, p, out); err != nil {
@@ -71,10 +71,10 @@ func BuildMatchQuery(branches []PatternBranch, accessType string, callerID strin
 	var args []interface{}
 
 	b.WriteString("SELECT o.id, o.json FROM objects o WHERE o.expires > ?")
-	args = append(args, now.UTC().Format(idFormat))
+	args = append(args, now.UTC().Format(timestampFormat))
 
 	b.WriteString(" AND (o.invisible_until IS NULL OR o.invisible_until <= ?)")
-	args = append(args, now.UTC().Format(idFormat))
+	args = append(args, now.UTC().Format(timestampFormat))
 
 	b.WriteString(" AND o.id > ?")
 	args = append(args, since)
