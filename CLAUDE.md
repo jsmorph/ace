@@ -58,6 +58,12 @@ logging or other messages.
 Do no swallow any errors. Simply logging an error counts as
 "swallowing".
 
+For commit messages: The first line is a headline, with the first
+letter capitalized unless it's a symbol that really shouldn't be.
+Always less than 60 characters.  No period at the end.  The body, if
+one is necessary, is very concise, grammatical, and precise.  If a
+body isn't really necessary, don't provide one.
+
 
 ## Ask for editorial clarification
 
