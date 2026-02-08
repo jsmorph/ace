@@ -1,0 +1,16 @@
+{
+  "object_size": 2048,
+  "property_size": 64,
+  "object_value_size": 128,
+  "object_unmatchable_value_size": 256,
+  "object_leaves": 8,
+  "object_array_length": 4,
+  "pattern_size": 2048,
+  "pattern_leaves": 4,
+  "pattern_array_length": 4,
+  "pattern_atomic_length": 128,
+  "access_size": 1024,
+  "access_length": 16,
+  "ttl_max": "P7D",
+  "id_size": 128
+}

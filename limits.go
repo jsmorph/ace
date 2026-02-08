@@ -7,6 +7,53 @@ import (
 	"time"
 )
 
+// MarshalJSON encodes Limits to JSON with TTLMax as an ISO 8601 duration string.
+func (l Limits) MarshalJSON() ([]byte, error) {
+	type alias Limits
+	return json.Marshal(struct {
+		alias
+		TTLMax string `json:"ttl_max"`
+	}{
+		alias:  alias(l),
+		TTLMax: FormatISO8601Duration(l.TTLMax),
+	})
+}
+
+// UnmarshalJSON decodes Limits from JSON, accepting TTLMax as either an
+// ISO 8601 duration string (e.g., "P7D") or a number of nanoseconds.
+func (l *Limits) UnmarshalJSON(data []byte) error {
+	type alias Limits
+	wire := struct {
+		alias
+		TTLMax json.RawMessage `json:"ttl_max"`
+	}{
+		alias: alias(*l),
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+	*l = Limits(wire.alias)
+
+	if len(wire.TTLMax) == 0 {
+		return nil
+	}
+	var s string
+	if json.Unmarshal(wire.TTLMax, &s) == nil {
+		d, err := ParseISO8601Duration(s)
+		if err != nil {
+			return fmt.Errorf("invalid ttl_max %q: %w", s, err)
+		}
+		l.TTLMax = d
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(wire.TTLMax, &n); err != nil {
+		return fmt.Errorf("ttl_max must be a duration string or nanoseconds")
+	}
+	l.TTLMax = time.Duration(n)
+	return nil
+}
+
 // ValidationError indicates a client-supplied value violates a constraint.
 type ValidationError struct {
 	Err error
@@ -24,10 +71,11 @@ func validationErr(err error) error {
 
 // Limits constrains object, pattern, access, and TTL parameters.
 type Limits struct {
-	ObjectSize          int           `json:"object_size"`
-	PropertySize        int           `json:"property_size"`
-	ObjectValueSize     int           `json:"object_value_size"`
-	ObjectLeaves        int           `json:"object_leaves"`
+	ObjectSize                 int           `json:"object_size"`
+	PropertySize               int           `json:"property_size"`
+	ObjectValueSize            int           `json:"object_value_size"`
+	ObjectUnmatchableValueSize int           `json:"object_unmatchable_value_size"`
+	ObjectLeaves               int           `json:"object_leaves"`
 	ObjectArrayLength   int           `json:"object_array_length"`
 	PatternSize         int           `json:"pattern_size"`
 	PatternLeaves       int           `json:"pattern_leaves"`
@@ -42,10 +90,11 @@ type Limits struct {
 // DefaultLimits returns the default limits.
 func DefaultLimits() Limits {
 	return Limits{
-		ObjectSize:          2048,
-		PropertySize:        64,
-		ObjectValueSize:     128,
-		ObjectLeaves:        8,
+		ObjectSize:                 2048,
+		PropertySize:               64,
+		ObjectValueSize:            128,
+		ObjectUnmatchableValueSize: 256,
+		ObjectLeaves:               8,
 		ObjectArrayLength:   4,
 		PatternSize:         2048,
 		PatternLeaves:       4,
@@ -80,15 +129,18 @@ func (l Limits) ValidateObject(raw []byte) error {
 func (l Limits) walkObject(obj map[string]interface{}, path string) (int, error) {
 	leaves := 0
 	for k, v := range obj {
+		fullPath := k
+		if path != "" {
+			fullPath = path + "." + k
+		}
 		if strings.HasPrefix(k, "#") {
+			if err := l.walkMeta(v, fullPath); err != nil {
+				return 0, err
+			}
 			continue
 		}
 		if len(k) > l.PropertySize {
 			return 0, fmt.Errorf("property name %q is %d > %d bytes", k, len(k), l.PropertySize)
-		}
-		fullPath := k
-		if path != "" {
-			fullPath = path + "." + k
 		}
 		switch val := v.(type) {
 		case map[string]interface{}:
@@ -129,6 +181,32 @@ func (l Limits) walkObject(obj map[string]interface{}, path string) (int, error)
 		}
 	}
 	return leaves, nil
+}
+
+func (l Limits) walkMeta(v interface{}, path string) error {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		for k, child := range val {
+			if err := l.walkMeta(child, path+"."+k); err != nil {
+				return err
+			}
+		}
+	case []interface{}:
+		for i, elem := range val {
+			if err := l.walkMeta(elem, fmt.Sprintf("%s[%d]", path, i)); err != nil {
+				return err
+			}
+		}
+	default:
+		ser, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Errorf("cannot serialize value at %q: %w", path, err)
+		}
+		if len(ser) > l.ObjectUnmatchableValueSize {
+			return fmt.Errorf("value at %q is %d > %d bytes", path, len(ser), l.ObjectUnmatchableValueSize)
+		}
+	}
+	return nil
 }
 
 // ValidatePattern checks a pattern against size, leaf, and array limits.

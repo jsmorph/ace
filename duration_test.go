@@ -34,6 +34,29 @@ func TestParseISO8601Duration(t *testing.T) {
 	}
 }
 
+func TestFormatISO8601Duration(t *testing.T) {
+	cases := []struct {
+		input time.Duration
+		want  string
+	}{
+		{0, "PT0S"},
+		{7 * 24 * time.Hour, "P7D"},
+		{24 * time.Hour, "P1D"},
+		{time.Hour, "PT1H"},
+		{30 * time.Minute, "PT30M"},
+		{5 * time.Second, "PT5S"},
+		{36 * time.Hour, "P1DT12H"},
+		{90 * time.Minute, "PT1H30M"},
+		{2*24*time.Hour + 3*time.Hour + 4*time.Minute + 5*time.Second, "P2DT3H4M5S"},
+	}
+	for _, c := range cases {
+		got := FormatISO8601Duration(c.input)
+		if got != c.want {
+			t.Errorf("FormatISO8601Duration(%v) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}
+
 func TestParseISO8601DurationErrors(t *testing.T) {
 	cases := []string{
 		"",

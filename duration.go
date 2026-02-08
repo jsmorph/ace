@@ -3,8 +3,47 @@ package ace
 import (
 	"fmt"
 	"math"
+	"strings"
 	"time"
 )
+
+// FormatISO8601Duration formats a time.Duration as an ISO 8601 duration string
+// (e.g., "P7D", "PT1H30M"). Sub-second precision is discarded.
+func FormatISO8601Duration(d time.Duration) string {
+	if d == 0 {
+		return "PT0S"
+	}
+
+	var b strings.Builder
+	b.WriteByte('P')
+
+	days := int(d / (24 * time.Hour))
+	d -= time.Duration(days) * 24 * time.Hour
+	if days > 0 {
+		fmt.Fprintf(&b, "%dD", days)
+	}
+
+	hours := int(d / time.Hour)
+	d -= time.Duration(hours) * time.Hour
+	minutes := int(d / time.Minute)
+	d -= time.Duration(minutes) * time.Minute
+	seconds := int(d / time.Second)
+
+	if hours > 0 || minutes > 0 || seconds > 0 {
+		b.WriteByte('T')
+		if hours > 0 {
+			fmt.Fprintf(&b, "%dH", hours)
+		}
+		if minutes > 0 {
+			fmt.Fprintf(&b, "%dM", minutes)
+		}
+		if seconds > 0 {
+			fmt.Fprintf(&b, "%dS", seconds)
+		}
+	}
+
+	return b.String()
+}
 
 // ParseISO8601Duration parses a subset of ISO 8601 durations (P1D, PT1H30M, etc.)
 // into a time.Duration.
