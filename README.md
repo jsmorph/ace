@@ -191,6 +191,8 @@ ace test --writers 8 --readers 8 --requests 200
 | POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return active limits |
 | GET | `/stats` | Return storage statistics |
+| POST | `/reg` | Register a client identity |
+| GET | `/regcheck` | Look up a client identity |
 
 See the [HTTP API specification](http-spec.md) for
 request/response formats and error codes.
@@ -203,24 +205,34 @@ identities:
 
 ```
 curl -X POST http://localhost:8000/out \
-  -d '{"object":{"type":"task","payload":"compute"},"access":{"in":["worker-1"],"rd":["monitor"]}}'
+  -d '{"object":{"type":"task","payload":"compute"},"access":{"in":["ace:a1b2..."],"rd":["acen:monitor"]}}'
 ```
 
-Only `worker-1` can consume this object (`in`) and only
-`monitor` can read it (`rd`). Callers identify themselves
-with the `X-ACE-ID` header (or `--id` on the CLI):
+Only the identity `ace:a1b2...` can consume this object
+(`in`) and only `acen:monitor` can read it (`rd`).
+
+Callers authenticate with the `X-ACE-Client-Key` header,
+which the server resolves to an `ace:` identity. Register a
+client identity first with `POST /reg` (or `ace reg` on the
+CLI):
+
+```
+curl -X POST http://localhost:8000/reg -d '{"name":"monitor"}'
+```
+
+Then use the returned key to authenticate:
 
 ```
 curl -X POST http://localhost:8000/in \
-  -H "X-ACE-ID: worker-1" \
+  -H "X-ACE-Client-Key: <key>" \
   -d '{"pattern":{"type":"task"}}'
 ```
 
-If an object has no `access` parameter, any caller can read
-or consume it regardless of whether `X-ACE-ID` is present.
-If an object has an `access.in` list, only callers whose
-`X-ACE-ID` appears in that list can consume it. The
-`access.rd` list works the same way for `rd`.
+Access lists accept both `ace:` IDs and `acen:` names. Names
+are resolved to IDs at `out` time. If an object has no
+`access` parameter, any caller can read or consume it. See
+the [specification](spec.md) for full access control rules
+and the `--insecure-ids` mode for development.
 
 ## TTL
 
@@ -291,8 +303,6 @@ content-based pattern matching for blocking notifications.
       to `stdout`. Similarly for `ace rd`.
 
 - [ ] Probably not: Support unification in pattern matching.
-
-- [ ] Client identifiers!
 
 ## References
 

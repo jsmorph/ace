@@ -140,12 +140,20 @@ clean up immediately.
 
 ## Business workflow with access control
 
-Multiple agents share a database file. An intake agent posts
-customer requests. Only authorized processing agents can
-claim them. A compliance agent can read any request without
-consuming it. (For network access,
-`ace serve --db shared.db` exposes the same operations over
-HTTP.)
+An intake agent posts customer requests. Only authorized
+processing agents can claim them. A compliance agent can read
+any request without consuming it.
+
+These examples use bare identity strings for clarity. Start
+the server with `--insecure-ids` to allow bare `--id` values
+and unprefixed access list entries:
+
+```
+ace serve --db shared.db --insecure-ids
+```
+
+In production, clients register with `ace reg` and
+authenticate with `--key` instead of `--id`.
 
 The intake agent posts a request. The `access` parameter
 restricts who can consume or read it. The `#description`
@@ -153,7 +161,7 @@ field is metadata: passed through to the processing agent but
 not matchable, since it contains free text.
 
 ```
-ace out --db shared.db \
+ace out --server http://localhost:8000 \
   --object '{"type":"request","ticket":"TK-4821","department":"billing","priority":"high","#description":"Customer reports duplicate charge on invoice 9917"}' \
   --access '{"in":["billing-agent","escalation-agent"],"rd":["compliance-agent","billing-agent","escalation-agent"]}'
 ```
@@ -166,14 +174,14 @@ The compliance agent reads all pending requests to verify
 they have been logged:
 
 ```
-ace rd --db shared.db --id compliance-agent \
+ace rd --server http://localhost:8000 --id compliance-agent \
   --pattern '{"type":"request"}'
 ```
 
 The billing agent claims the request:
 
 ```
-ace in --db shared.db --id billing-agent \
+ace in --server http://localhost:8000 --id billing-agent \
   --pattern '{"type":"request","department":"billing"}'
 ```
 
@@ -182,14 +190,14 @@ departments. An array in the pattern matches any of the
 listed values:
 
 ```
-ace in --db shared.db --id escalation-agent \
+ace in --server http://localhost:8000 --id escalation-agent \
   --pattern '{"type":"request","priority":"high","department":["billing","support","shipping"]}'
 ```
 
 An unauthorized agent gets nothing:
 
 ```
-ace in --db shared.db --id marketing-agent \
+ace in --server http://localhost:8000 --id marketing-agent \
   --pattern '{"type":"request","department":"billing"}'
 ```
 
@@ -200,13 +208,13 @@ After resolving the issue, the billing agent posts a
 resolution that anyone can read:
 
 ```
-ace out --db shared.db \
+ace out --server http://localhost:8000 \
   --object '{"type":"resolution","ticket":"TK-4821","department":"billing","#outcome":"Refund issued for duplicate charge"}'
 ```
 
 The compliance agent reads the resolution by ticket number:
 
 ```
-ace rd --db shared.db --id compliance-agent \
+ace rd --server http://localhost:8000 --id compliance-agent \
   --pattern '{"type":"resolution","ticket":"TK-4821"}'
 ```

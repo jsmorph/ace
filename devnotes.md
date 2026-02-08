@@ -158,10 +158,11 @@ three places: `extractFromObject` (branch.go),
 keys at every recursion level.
 
 `#` properties in patterns are rejected as errors because
-there are no branches to match against. `walkObject`
-(limits.go) also skips `#` properties so they don't count
-against the object leaf limit, while `walkPattern` rejects
-them.
+there are no branches to match against. In limits.go,
+`walkObject` delegates `#` properties to `walkMeta`, which
+checks their values against `ObjectUnmatchableValueSize`
+(default 256). Metadata leaves do not count against the
+object leaf limit. `walkPattern` rejects `#` properties.
 
 Quamina's `MatchesForEvent` receives the full object JSON
 (including `#` fields). Since registered patterns never
@@ -206,8 +207,9 @@ identities.
 
 The `identities` table uses `key` as the primary key because
 the hot path is key-to-ID resolution on every authenticated
-request. `id` and `name` have UNIQUE constraints. A separate
-index on `name` supports `acen:` resolution at `out` time.
+request. `id` and `name` have UNIQUE constraints, which
+provide implicit indexes for lookups and `acen:` resolution
+at `out` time.
 
 ### Naming scheme
 

@@ -45,9 +45,11 @@ rules are in `spec.md`.
 
 An object can restrict which callers may read or consume it. The
 `access` parameter on `out` accepts lists of permitted caller
-identities for `in` and `rd` independently. Callers identify
-themselves with the `X-ACE-ID` header (or `--id` on the CLI).
-Objects without access restrictions are available to everyone.
+identities for `in` and `rd` independently. Callers authenticate
+with the `X-ACE-Client-Key` header (or `--key` on the CLI), which
+the server resolves to an `ace:` identity. Register identities with
+`POST /reg` (or `ace reg`). Objects without access restrictions are
+available to everyone.
 
 ## TTL
 

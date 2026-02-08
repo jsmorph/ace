@@ -326,6 +326,7 @@ an error that states both the observed and maximum values
 | Object size | 2048 bytes |
 | Property name size | 64 bytes |
 | Object value size | 128 bytes |
+| Object unmatchable value size | 256 bytes |
 | Object leaves | 8 |
 | Object array length | 4 |
 | Pattern size | 2048 bytes |
@@ -342,4 +343,5 @@ element of an array in an object counts as one leaf:
 `{"a":[1,2,3]}` has three leaves. A pattern leaf is a single
 constraint: a scalar is one leaf, and an array of
 alternatives is one leaf. Metadata properties (names starting
-with `#`) do not count as leaves.
+with `#`) do not count as leaves but their values are checked
+against the unmatchable value size limit.
