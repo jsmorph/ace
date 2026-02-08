@@ -2,14 +2,14 @@ package ace
 
 import "embed"
 
-//go:embed README.md spec.md http-spec.md cli-spec.md guide.md skill.md
+//go:embed README.md docs/spec.md docs/http-spec.md docs/cli-spec.md docs/guide.md docs/skill.md
 var Docs embed.FS
 
 var DocFiles = []string{
 	"README.md",
-	"spec.md",
-	"http-spec.md",
-	"cli-spec.md",
-	"guide.md",
-	"skill.md",
+	"docs/spec.md",
+	"docs/http-spec.md",
+	"docs/cli-spec.md",
+	"docs/guide.md",
+	"docs/skill.md",
 }

@@ -61,7 +61,7 @@ func usage() {
 }
 
 func cmdHelp() {
-	data, err := ace.Docs.ReadFile("skill.md")
+	data, err := ace.Docs.ReadFile("docs/skill.md")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -794,6 +794,10 @@ func cmdDoc(args []string) {
 		return
 	}
 	data, err := ace.Docs.ReadFile(args[0])
+	if err != nil {
+		// Try without docs/ prefix for backward compatibility.
+		data, err = ace.Docs.ReadFile("docs/" + args[0])
+	}
 	if err != nil {
 		log.Fatalf("unknown document: %s", args[0])
 	}

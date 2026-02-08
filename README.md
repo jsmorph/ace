@@ -40,7 +40,7 @@ no broker topics.
 
 ACE adapts Gelernter's model for this setting, replacing
 tuples with JSON objects and adding access control, TTL, and
-an HTTP interface. The [usage guide](guide.md) walks through
+an HTTP interface. The [usage guide](docs/guide.md) walks through
 three realistic scenarios.
 
 ## Operations
@@ -103,7 +103,7 @@ Properties whose names start with `#` are unmatched: stored in
 the object and returned to callers, but excluded from pattern
 matching. They do not count against the object leaf limit. A
 `#` property in a pattern is an error. See the
-[specification](spec.md) for details.
+[specification](docs/spec.md) for details.
 
 ## Usage
 
@@ -194,7 +194,7 @@ ace test --writers 8 --readers 8 --requests 200
 | POST | `/reg` | Register a client identity |
 | GET | `/regcheck` | Look up a client identity |
 
-See the [HTTP API specification](http-spec.md) for
+See the [HTTP API specification](docs/http-spec.md) for
 request/response formats and error codes.
 
 ## Access control
@@ -231,7 +231,7 @@ curl -X POST http://localhost:8000/in \
 Access lists accept both `ace:` IDs and `acen:` names. Names
 are resolved to IDs at `out` time. If an object has no
 `access` parameter, any caller can read or consume it. See
-the [specification](spec.md) for full access control rules
+the [specification](docs/spec.md) for full access control rules
 and the `--insecure-ids` mode for development.
 
 ## TTL
@@ -249,15 +249,15 @@ invisible and returns a `delete_id`. The caller confirms
 deletion by calling `del` with that ID within the visibility
 timeout (default: 30 seconds). If confirmation does not
 arrive in time, the object reappears in the space. See the
-[specification](spec.md) for details.
+[specification](docs/spec.md) for details.
 
 ## Configuration
 
 The server accepts `--blocking` (`polling` or `notify`),
 `--scavenge` (expiration interval), `--max-waiters`
 (concurrent blocking client limit), and `--limits` (JSON file
-overriding default limits). The [CLI reference](cli-spec.md)
-documents all flags; the [specification](spec.md) lists
+overriding default limits). The [CLI reference](docs/cli-spec.md)
+documents all flags; the [specification](docs/spec.md) lists
 limits and their defaults.
 
 ## Event pattern matching
@@ -276,12 +276,12 @@ up to execute their queries.
 
 | Document | Scope |
 |----------|-------|
-| [Specification](spec.md) | Operations, matching, access, TTL, limits |
-| [HTTP API](http-spec.md) | Endpoints, request/response formats |
-| [CLI reference](cli-spec.md) | Subcommands, flags, stdin behavior |
-| [Usage guide](guide.md) | Worked examples for three scenarios |
-| [Related systems](related.md) | Real-world analogs to the tuple-space model |
-| [Pattern extensions](extensions.md) | Numeric and string inequality matching via Quamina fork |
+| [Specification](docs/spec.md) | Operations, matching, access, TTL, limits |
+| [HTTP API](docs/http-spec.md) | Endpoints, request/response formats |
+| [CLI reference](docs/cli-spec.md) | Subcommands, flags, stdin behavior |
+| [Usage guide](docs/guide.md) | Worked examples for three scenarios |
+| [Related systems](docs/related.md) | Real-world analogs to the tuple-space model |
+| [Pattern extensions](docs/extensions.md) | Numeric and string inequality matching via Quamina fork |
 
 ## Dependencies
 
