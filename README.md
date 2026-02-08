@@ -70,17 +70,16 @@ object first.
 
 ## Pattern matching
 
-A pattern is a JSON object. An object matches a pattern
-according to the object's branches: root-to-leaf paths
-through the JSON structure. The rule:
+A pattern is a JSON object. Matching decomposes both pattern
+and object into branches: root-to-leaf paths through the JSON
+structure. `{"a":{"b":1},"c":2}` has branches `a.b=1` and
+`c=2`. An object matches when every branch in the pattern
+appears in the object.
 
-```
-For every branch B with leaf L in the pattern:
-  If L is atomic: B appears in the object.
-  If L is an array [X1,...,Xn]: B with leaf Xi appears in the object for some i.
-```
-
-An array in a pattern means "any of these values." Extra
+An array in a pattern means "any of these values":
+`{"a":[1,2]}` matches if the object contains `a=1` or `a=2`.
+An array in an object produces one branch per element:
+`{"a":[1,2,3]}` produces `a=1`, `a=2`, and `a=3`. Extra
 fields in the object do not prevent a match. The empty
 pattern `{}` matches any object.
 
@@ -95,8 +94,8 @@ pattern `{}` matches any object.
 | `{"a":{"b":1,"c":2}}` | `{"a":{"b":1,"c":2,"d":3}}` | yes |
 | `{"a":{"b":1,"c":2},"d":3}` | `{"a":{"b":1,"c":2,"d":3}}` | no |
 
-The last row fails because `"d":3` must appear at the top
-level of the object, but it appears only inside `"a"`.
+The last row fails because the pattern requires branch `d=3`
+at the root, but the object has `d=3` only under `a`.
 
 ## Metadata properties
 

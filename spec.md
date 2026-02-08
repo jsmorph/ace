@@ -102,24 +102,27 @@ identifier. The effect is FIFO ordering.
 
 ## Pattern matching
 
-A pattern is a JSON object. An object matches a pattern when
-every root-to-leaf path (branch) in the pattern has a
-corresponding branch in the object.
+A pattern is a JSON object. Matching decomposes both pattern
+and object into branches: the root-to-leaf paths through the
+JSON structure. Each branch records property names from the
+root to a scalar value. `{"a":{"b":1},"c":2}` has two
+branches: `a.b=1` and `c=2`.
 
-```
-For every branch B with leaf L in the pattern:
-  If L is atomic: B appears in the object.
-  If L is an array [X1,...,Xn]: B with leaf Xi appears in the object for some i.
-```
+An object matches a pattern when every branch in the pattern
+has a corresponding branch in the object. Extra branches in
+the object do not prevent a match. The empty pattern `{}` has
+no branches and matches every object.
 
-An array in a pattern means "any of these values." A single
-value is shorthand for a one-element array, so `{"a":1}` and
-`{"a":[1]}` are equivalent patterns. An array in an object
-generates one branch per element: `{"a":[1,2,3]}` produces
-branches `a=1`, `a=2`, and `a=3`. A pattern value matches if
-any element of the object array equals it. Extra fields in
-the object do not prevent a match. The empty pattern `{}`
-matches every object.
+Arrays serve different purposes in patterns and objects. In a
+pattern, an array means "any of these values":
+`{"a":[1,2]}` requires that the object contain branch `a=1`
+or `a=2`. A scalar is shorthand for a one-element array, so
+`{"a":1}` and `{"a":[1]}` are equivalent patterns.
+
+In an object, each array element produces its own branch:
+`{"a":[1,2,3]}` produces branches `a=1`, `a=2`, and `a=3`.
+A pattern value matches if any element of the object's array
+satisfies it.
 
 | Pattern | Object | Match? |
 |---------|--------|--------|
@@ -136,9 +139,8 @@ matches every object.
 | `{"a":[2,4]}` | `{"a":[1,2,3]}` | yes |
 | `{"a":{"b":1,"c":2},"d":3}` | `{"a":{"b":1,"c":2,"d":3}}` | no |
 
-The last row fails because the pattern requires `"d":3` at
-the top level, but the object contains `"d":3` only inside
-`"a"`.
+The last row fails because the pattern requires branch `d=3`
+at the root, but the object has `d=3` only under `a`.
 
 ## Metadata properties
 
