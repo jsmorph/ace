@@ -291,6 +291,11 @@ content-based pattern matching for blocking notifications.
 
 ## Roadmap
 
+- [ ] Other binary relations in addition to equality.  Examples:
+      numeric `<`, `<=`; string versions; prefix.  See what Quamina
+      supports as a guide.  We'd need to keep it simple to have SQL
+      equivalents.
+
 - [ ] Support updating visibility timeout for an emitted
       object (as in SQS).
 
