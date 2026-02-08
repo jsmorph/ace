@@ -2,6 +2,6 @@
 *.db-wal
 *.db-shm
 *~
-ace
+/ace
 task.md
 issues.md

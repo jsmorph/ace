@@ -195,6 +195,61 @@ extra SQL query, then back to sleep.
 simplest correct configuration for SQLite. If read contention
 becomes measurable, split into writer + reader pool.
 
+## Identity System
+
+Client identities provide key-based authentication for access
+control. The system replaces the honor-system `X-ACE-ID`
+header with cryptographic keys that resolve to verified
+identities.
+
+### Schema
+
+The `identities` table uses `key` as the primary key because
+the hot path is key-to-ID resolution on every authenticated
+request. `id` and `name` have UNIQUE constraints. A separate
+index on `name` supports `acen:` resolution at `out` time.
+
+### Naming scheme
+
+Two prefixes disambiguate IDs from names in access lists:
+`ace:` for IDs (generated, 64 hex characters) and `acen:`
+for names (user-chosen, 1-20 characters matching
+`[a-zA-Z0-9_-]`). When no name is given, the `name` column
+stores the `ace:<id>` value.
+
+### Access resolution at out time
+
+`acen:` entries in access lists are resolved to `ace:` IDs at
+`out` time, before storage. This means stored access lists
+contain only `ace:` IDs, which simplifies the `in`/`rd` query
+path: no name resolution at read time. If a name is not
+found, `Out` returns a validation error.
+
+### InsecureIDs mode
+
+When `Config.InsecureIDs` is false (the default), access list
+entries must carry an `ace:` or `acen:` prefix, and the
+`X-ACE-ID` header is rejected. When true, bare strings are
+accepted in both contexts for backward compatibility with
+existing tests and development workflows.
+
+### LookupKey atomicity
+
+`LookupKey` updates `last_active` and reads the identity in a
+single transaction: `UPDATE` then `SELECT` within
+`WithTransaction`. This avoids a separate touch operation and
+keeps the last-active timestamp current for identity
+expiration. The `RETURNING` clause would be more elegant but
+the two-statement approach works with the existing
+transaction helper.
+
+### Identity expiration
+
+`DeleteExpiredIdentities` removes rows where `last_active` is
+older than `now - IdentityTTL`. The scavenger calls this on
+the same interval as object expiration. The default TTL of 40
+days accommodates intermittent clients.
+
 ## Explicit Deletes
 
 SQS-style visibility timeout for `in` operations. When

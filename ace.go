@@ -101,6 +101,11 @@ func (s *Space) Limits() Limits {
 	return s.cfg.Limits
 }
 
+// Config returns the active configuration.
+func (s *Space) Config() Config {
+	return s.cfg
+}
+
 func (s *Space) logSlowOp(desc string) func() {
 	if s.cfg.DBOperationTimeMonitorLimit <= 0 {
 		return func() {}
@@ -141,6 +146,16 @@ func (s *Space) Out(object json.RawMessage, access *Access, ttl time.Duration) (
 		if err := s.cfg.Limits.ValidateAccess(raw); err != nil {
 			return "", validationErr(err)
 		}
+		if !s.cfg.InsecureIDs {
+			if err := ValidateAccessPrefixes(access); err != nil {
+				return "", err
+			}
+		}
+		resolved, err := s.ResolveAccess(access)
+		if err != nil {
+			return "", err
+		}
+		access = resolved
 	}
 
 	branches, err := ExtractBranches(object)

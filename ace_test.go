@@ -16,6 +16,7 @@ func newTestSpace(t *testing.T) *Space {
 	t.Helper()
 	cfg := DefaultConfig()
 	cfg.Blocking = BlockingPoll
+	cfg.InsecureIDs = true
 	return newTestSpaceWithConfig(t, cfg)
 }
 
@@ -587,6 +588,7 @@ func newTestSpaceDeletes(t *testing.T, visTimeout time.Duration) *Space {
 	cfg := DefaultConfig()
 	cfg.Blocking = BlockingPoll
 	cfg.Deletes = true
+	cfg.InsecureIDs = true
 	cfg.VisibilityTimeout = visTimeout
 	return newTestSpaceWithConfig(t, cfg)
 }

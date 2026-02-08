@@ -20,6 +20,8 @@ type Config struct {
 	Deletes                     bool          `json:"deletes"`
 	VisibilityTimeout           time.Duration `json:"visibility_timeout"`
 	DBOperationTimeMonitorLimit time.Duration `json:"db_operation_time_monitor_limit"`
+	InsecureIDs                 bool          `json:"insecure_ids"`
+	IdentityTTL                 time.Duration `json:"identity_ttl"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -30,5 +32,6 @@ func DefaultConfig() Config {
 		ScavengeInterval:            time.Hour,
 		VisibilityTimeout:           30 * time.Second,
 		DBOperationTimeMonitorLimit: time.Second,
+		IdentityTTL:                 40 * 24 * time.Hour,
 	}
 }

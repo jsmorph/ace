@@ -32,6 +32,8 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	mux.HandleFunc("/match", srv.handleMatchTest)
 	mux.HandleFunc("/limits", srv.handleLimits)
 	mux.HandleFunc("/stats", srv.handleStats)
+	mux.HandleFunc("/reg", srv.handleReg)
+	mux.HandleFunc("/regcheck", srv.handleRegCheck)
 	mux.HandleFunc("/doc", handleDocIndex)
 	mux.HandleFunc("/doc/", handleDocFile)
 	srv.mux = mux
@@ -118,7 +120,11 @@ func (srv *Server) handleMatch(w http.ResponseWriter, r *http.Request, remove bo
 		return
 	}
 
-	callerID := r.Header.Get("X-ACE-ID")
+	callerID, err := srv.resolveCallerID(r)
+	if err != nil {
+		writeError(w, httpStatusForError(err), err.Error())
+		return
+	}
 
 	var req matchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -285,6 +291,120 @@ func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
 
 	if err := writeJSON(w, http.StatusOK, matchTestResponse{Match: ok}); err != nil {
 		log.Printf("handleMatchTest: write response: %v", err)
+	}
+}
+
+func (srv *Server) resolveCallerID(r *http.Request) (string, error) {
+	clientKey := r.Header.Get("X-ACE-Client-Key")
+	if clientKey != "" {
+		ident, err := srv.space.LookupKey(clientKey)
+		if err != nil {
+			return "", fmt.Errorf("key lookup: %w", err)
+		}
+		if ident == nil {
+			return "", validationErr(fmt.Errorf("invalid client key"))
+		}
+		return ident.ID, nil
+	}
+	aceID := r.Header.Get("X-ACE-ID")
+	if aceID != "" {
+		if !srv.space.Config().InsecureIDs {
+			return "", validationErr(fmt.Errorf(
+				"X-ACE-ID requires --insecure-ids; use X-ACE-Client-Key"))
+		}
+		return aceID, nil
+	}
+	return "", nil
+}
+
+type regRequest struct {
+	Name string `json:"name,omitempty"`
+}
+
+type regResponse struct {
+	Key  string `json:"key"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (srv *Server) handleReg(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req regRequest
+	json.NewDecoder(r.Body).Decode(&req)
+
+	ident, err := srv.space.Register(req.Name)
+	if err != nil {
+		writeError(w, httpStatusForError(err), err.Error())
+		return
+	}
+
+	if err := writeJSON(w, http.StatusOK, regResponse{
+		Key:  ident.Key,
+		ID:   ident.ID,
+		Name: ident.Name,
+	}); err != nil {
+		log.Printf("handleReg: write response: %v", err)
+	}
+}
+
+type regCheckResponse struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+func (srv *Server) handleRegCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+
+	clientKey := r.Header.Get("X-ACE-Client-Key")
+	if clientKey == "" {
+		clientKey = r.URL.Query().Get("key")
+	}
+	queryID := r.URL.Query().Get("id")
+	queryName := r.URL.Query().Get("name")
+
+	var ident *Identity
+	var err error
+	var resp regCheckResponse
+
+	switch {
+	case clientKey != "":
+		ident, err = srv.space.LookupKey(clientKey)
+		if err == nil && ident != nil {
+			resp = regCheckResponse{ID: ident.ID, Name: ident.Name}
+		}
+	case queryID != "":
+		ident, err = srv.space.LookupID(queryID)
+		if err == nil && ident != nil {
+			resp = regCheckResponse{Name: ident.Name}
+		}
+	case queryName != "":
+		ident, err = srv.space.LookupName(queryName)
+		if err == nil && ident != nil {
+			resp = regCheckResponse{ID: ident.ID}
+		}
+	default:
+		writeError(w, http.StatusBadRequest, "provide key, id, or name")
+		return
+	}
+
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if ident == nil {
+		writeError(w, http.StatusNotFound, "identity not found")
+		return
+	}
+
+	if err := writeJSON(w, http.StatusOK, resp); err != nil {
+		log.Printf("handleRegCheck: write response: %v", err)
 	}
 }
 

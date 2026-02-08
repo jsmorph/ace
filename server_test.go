@@ -259,6 +259,7 @@ func newTestServerHTTP(t *testing.T, maxWaiters int) (*httptest.Server, *Space) 
 	t.Helper()
 	cfg := DefaultConfig()
 	cfg.Blocking = BlockingNotify
+	cfg.InsecureIDs = true
 	return newTestServerHTTPWithConfig(t, cfg, maxWaiters)
 }
 
@@ -397,6 +398,7 @@ func newTestServerDeletes(t *testing.T) *httptest.Server {
 	cfg := DefaultConfig()
 	cfg.Blocking = BlockingNotify
 	cfg.Deletes = true
+	cfg.InsecureIDs = true
 	cfg.VisibilityTimeout = 5 * time.Second
 	ts, _ := newTestServerHTTPWithConfig(t, cfg, 0)
 	return ts
@@ -730,6 +732,230 @@ func TestServerZeroTTLRejected(t *testing.T) {
 	srv := newTestServer(t)
 
 	body := `{"object":{"a":1},"ttl":"PT0S"}`
+	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func newTestServerSecure(t *testing.T) (*Server, *Space) {
+	t.Helper()
+	cfg := DefaultConfig()
+	cfg.Blocking = BlockingPoll
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	s, err := NewSpace(dbPath, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := s.Close(); err != nil {
+			t.Errorf("close: %v", err)
+		}
+	})
+	return NewServer(s, 0), s
+}
+
+func TestServerReg(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	req := httptest.NewRequest("POST", "/reg", bytes.NewBufferString(`{"name":"worker"}`))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp regResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Name != "acen:worker" {
+		t.Fatalf("expected name acen:worker, got %q", resp.Name)
+	}
+	if len(resp.Key) != 64 {
+		t.Fatalf("expected 64-char key, got %d", len(resp.Key))
+	}
+}
+
+func TestServerRegNoBody(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	req := httptest.NewRequest("POST", "/reg", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestServerRegDuplicateName(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	body := `{"name":"dup"}`
+	req := httptest.NewRequest("POST", "/reg", bytes.NewBufferString(body))
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("first reg expected 200, got %d", w.Code)
+	}
+
+	req = httptest.NewRequest("POST", "/reg", bytes.NewBufferString(body))
+	w = httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("second reg expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestServerKeyAuth(t *testing.T) {
+	srv, space := newTestServerSecure(t)
+
+	ident, err := space.Register("reader")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	acc := &Access{In: []string{ident.ID}}
+	if _, err := space.Out(json.RawMessage(`{"x":1}`), acc, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("POST", "/in",
+		bytes.NewBufferString(`{"pattern":{"x":1}}`))
+	req.Header.Set("X-ACE-Client-Key", ident.Key)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	body := strings.TrimSpace(w.Body.String())
+	if body == "null" {
+		t.Fatal("expected result, got null")
+	}
+}
+
+func TestServerInsecureIDRejected(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	req := httptest.NewRequest("POST", "/rd",
+		bytes.NewBufferString(`{"pattern":{}}`))
+	req.Header.Set("X-ACE-ID", "someone")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestServerInsecureIDAllowed(t *testing.T) {
+	srv := newTestServer(t)
+
+	req := httptest.NewRequest("POST", "/rd",
+		bytes.NewBufferString(`{"pattern":{}}`))
+	req.Header.Set("X-ACE-ID", "someone")
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestServerRegCheckByKey(t *testing.T) {
+	srv, space := newTestServerSecure(t)
+
+	ident, err := space.Register("checker")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/regcheck", nil)
+	req.Header.Set("X-ACE-Client-Key", ident.Key)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp regCheckResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != ident.ID {
+		t.Fatalf("expected id %q, got %q", ident.ID, resp.ID)
+	}
+	if resp.Name != ident.Name {
+		t.Fatalf("expected name %q, got %q", ident.Name, resp.Name)
+	}
+}
+
+func TestServerRegCheckByName(t *testing.T) {
+	srv, space := newTestServerSecure(t)
+
+	ident, err := space.Register("namedcheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/regcheck?name=acen:namedcheck", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp regCheckResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.ID != ident.ID {
+		t.Fatalf("expected id %q, got %q", ident.ID, resp.ID)
+	}
+	if resp.Name != "" {
+		t.Fatalf("expected no name field, got %q", resp.Name)
+	}
+}
+
+func TestServerRegCheckByID(t *testing.T) {
+	srv, space := newTestServerSecure(t)
+
+	ident, err := space.Register("idcheck")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest("GET", "/regcheck?id="+ident.ID, nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp regCheckResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp.Name != ident.Name {
+		t.Fatalf("expected name %q, got %q", ident.Name, resp.Name)
+	}
+	if resp.ID != "" {
+		t.Fatalf("expected no id field, got %q", resp.ID)
+	}
+}
+
+func TestServerRegCheckNotFound(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	req := httptest.NewRequest("GET", "/regcheck?key=nonexistent", nil)
+	w := httptest.NewRecorder()
+	srv.ServeHTTP(w, req)
+	if w.Code != 404 {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestServerOutRejectsUnprefixedAccess(t *testing.T) {
+	srv, _ := newTestServerSecure(t)
+
+	body := `{"object":{"a":1},"access":{"in":["bare-string"]}}`
 	req := httptest.NewRequest("POST", "/out", bytes.NewBufferString(body))
 	w := httptest.NewRecorder()
 	srv.ServeHTTP(w, req)

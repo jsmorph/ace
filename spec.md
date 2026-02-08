@@ -200,6 +200,62 @@ unrestricted objects but cannot match any access list. The
 identity `!` is reserved and cannot appear in access lists or
 as a callerID.
 
+## Identity
+
+ACE uses cryptographic keys to authenticate callers. A client
+registers with the space to receive a key and a unique
+identity. The key authenticates requests; the identity
+controls access to objects.
+
+### Registration
+
+`register(name)` creates a new identity and returns three
+values:
+
+| Field | Format | Purpose |
+|-------|--------|---------|
+| `key` | 64 hex characters | Authentication credential |
+| `id` | `ace:` + 64 hex characters | Unique identity |
+| `name` | `acen:` + user-supplied name | Human-readable alias |
+
+The `key` and `id` are independently generated from 32
+cryptographically random bytes. If no name is given, `name`
+defaults to the `id` value.
+
+Names must match `[a-zA-Z0-9_-]{1,20}` and are unique across
+the space. The `acen:` prefix distinguishes names from IDs in
+access lists.
+
+### Authentication
+
+A client authenticates by including its key in the
+`X-ACE-Client-Key` header. The server looks up the key and
+resolves it to the corresponding `ace:` identity. If the
+key is invalid, the request fails.
+
+When the `--insecure-ids` flag is set, clients may instead
+pass a bare identity string in the `X-ACE-ID` header without
+a key. This mode is intended for development and testing.
+
+### Access list resolution
+
+Access lists in `out` may reference identities by name
+(`acen:alice`) or by ID (`ace:<hex>`). At `out` time, `acen:`
+entries are resolved to their `ace:` IDs before storage. If a
+name does not exist, `out` returns an error.
+
+When `--insecure-ids` is off, every entry in an access list
+must carry an `ace:` or `acen:` prefix. Unprefixed entries
+are rejected. When `--insecure-ids` is on, unprefixed entries
+are allowed for backward compatibility.
+
+### Identity expiration
+
+Each identity records its last active time, updated on every
+key lookup. Identities that have not been active within the
+identity TTL (default: 40 days) are eligible for deletion by
+the scavenger.
+
 ## TTL and expiration
 
 Every object has a time-to-live. If `out` receives no `ttl`,

@@ -25,6 +25,13 @@ CREATE TABLE IF NOT EXISTS branches (
 CREATE INDEX IF NOT EXISTS idx_branches ON branches(id, b);
 CREATE INDEX IF NOT EXISTS idx_objects_delete_id ON objects(delete_id) WHERE delete_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_objects_expires ON objects(expires);
+
+CREATE TABLE IF NOT EXISTS identities (
+    key         TEXT PRIMARY KEY,
+    id          TEXT NOT NULL UNIQUE,
+    name        TEXT NOT NULL UNIQUE,
+    last_active TEXT NOT NULL
+);
 `
 
 func initSchema(db *sql.DB) error {

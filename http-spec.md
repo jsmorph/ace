@@ -15,6 +15,8 @@ control, TTL, blocking, and limits.
 | POST/GET | `/del` | Confirm deletion of an object |
 | GET | `/limits` | Return the active limits |
 | GET | `/stats` | Return storage statistics |
+| POST | `/reg` | Register a client identity |
+| GET | `/regcheck` | Look up a client identity |
 | GET | `/doc` | List embedded documentation |
 | GET | `/doc/{name}` | Return a documentation file |
 
@@ -50,9 +52,11 @@ Response (200):
 ## POST /in
 
 Find and remove the earliest matching object. The caller
-identifies itself with the `X-ACE-ID` header for access
-control. The header is optional; omit it when objects have no
-access restrictions.
+authenticates with the `X-ACE-Client-Key` header, which the
+server resolves to an `ace:` identity for access control. If
+`--insecure-ids` is enabled, a bare identity string may be
+passed in `X-ACE-ID` instead. Both headers are optional; omit
+them when objects have no access restrictions.
 
 Request body:
 
@@ -178,6 +182,50 @@ Returns storage statistics.
   "avg_access_rd_per_object": 0.05
 }
 ```
+
+## POST /reg
+
+Register a new client identity. See `spec.md` for the
+identity model.
+
+Request body (name is optional):
+
+```json
+{"name": "alice"}
+```
+
+| Field | Required | Purpose |
+|-------|----------|---------|
+| `name` | no | Human-readable name (1-20 alphanumeric, hyphen, or underscore characters) |
+
+Response (200):
+
+```json
+{"key": "a1b2c3...64hex", "id": "ace:d4e5f6...64hex", "name": "acen:alice"}
+```
+
+If no name is given, `name` defaults to the `id` value.
+Duplicate names return 400.
+
+## GET /regcheck
+
+Look up a registered identity by key, ID, or name. Provide
+exactly one of the three lookup methods. The response
+contains only the fields appropriate to the lookup method.
+
+| Lookup by | Parameter | Returns |
+|-----------|-----------|---------|
+| Key | `X-ACE-Client-Key` header or `key` query parameter | `id` and `name` |
+| ID | `id` query parameter | `name` |
+| Name | `name` query parameter | `id` |
+
+Example response for key lookup (200):
+
+```json
+{"id": "ace:d4e5f6...64hex", "name": "acen:alice"}
+```
+
+Returns 404 if the identity does not exist.
 
 ## GET /doc
 

@@ -29,8 +29,11 @@ Start the HTTP server.
 | `--max-waiters` | 0 | Max blocking clients; 0 = unlimited |
 | `--deletes` | false | Enable explicit deletes |
 | `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
+| `--insecure-ids` | false | Allow bare `X-ACE-ID` header without key authentication |
+| `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
 
-The server deletes expired objects at the scavenge interval.
+The server deletes expired objects and expired identities at
+the scavenge interval.
 
 ## ace out
 
@@ -61,7 +64,8 @@ Find and remove the earliest matching object.
 | `--server` | `$ACE_URL` | ACE server URL |
 | `--pattern` | (stdin) | JSON pattern |
 | `--since` | (none) | Only objects after this identifier |
-| `--id` | (none) | Caller identity for access control |
+| `--id` | (none) | Caller identity for access control (requires `--insecure-ids` in remote mode) |
+| `--key` | `$ACE_CLIENT_KEY` | Client key for authentication |
 | `--wait` | (none) | Block duration (integer seconds, ISO 8601, or Go duration) |
 | `--deletes` | false | Enable explicit deletes |
 
@@ -119,12 +123,55 @@ the fields.
 |------|---------|---------|
 | `--server` | `$ACE_URL` | ACE server URL |
 
+## ace reg
+
+Register a new client identity. See `spec.md` for the
+identity model.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
+| `--name` | (none) | Human-readable name |
+
+Output:
+
+```json
+{"key": "a1b2c3...64hex", "id": "ace:d4e5f6...64hex", "name": "acen:alice"}
+```
+
+## ace regcheck
+
+Look up a registered identity by key, ID, or name. Provide
+exactly one of the three lookup methods. The response
+contains only the fields appropriate to the lookup method.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
+| `--key` | `$ACE_CLIENT_KEY` | Client key |
+| `--id` | (none) | Identity ID |
+| `--name` | (none) | Identity name |
+
+| Lookup by | Returns |
+|-----------|---------|
+| `--key` | `id` and `name` |
+| `--id` | `name` |
+| `--name` | `id` |
+
+Example output for key lookup:
+
+```json
+{"id": "ace:d4e5f6...64hex", "name": "acen:alice"}
+```
+
 ## ace expire
 
-Delete all expired objects and report the count.
+Delete all expired objects and expired identities, and report
+the counts.
 
 ```
 deleted 7 expired objects
+deleted 0 expired identities
 ```
 
 ## ace help
