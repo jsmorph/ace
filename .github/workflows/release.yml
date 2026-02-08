@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (must already exist)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            echo "name=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.name }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: |
+          targets="linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64"
+          for target in $targets; do
+            os="${target%/*}"
+            arch="${target#*/}"
+            output="ace-${os}-${arch}"
+            if [ "$os" = "windows" ]; then
+              output="${output}.exe"
+            fi
+            GOOS="$os" GOARCH="$arch" go build -o "$output" ./cmd/ace
+          done
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "${{ steps.tag.outputs.name }}"
+          ace-linux-amd64
+          ace-linux-arm64
+          ace-darwin-amd64
+          ace-darwin-arm64
+          ace-windows-amd64.exe
+          --title "${{ steps.tag.outputs.name }}"
+          --generate-notes
