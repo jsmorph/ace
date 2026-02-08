@@ -281,6 +281,7 @@ up to execute their queries.
 | [CLI reference](cli-spec.md) | Subcommands, flags, stdin behavior |
 | [Usage guide](guide.md) | Worked examples for three scenarios |
 | [Related systems](related.md) | Real-world analogs to the tuple-space model |
+| [Pattern extensions](extensions.md) | Numeric and string inequality matching via Quamina fork |
 
 ## Dependencies
 
