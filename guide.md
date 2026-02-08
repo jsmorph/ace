@@ -19,7 +19,7 @@ coding task into subtasks. Worker agents claim subtasks and
 produce results. A reviewer agent checks each result.
 
 The orchestrator posts two subtasks. Properties prefixed with
-`#` are metadata: stored and returned to the consumer but
+`#` are unmatched: stored and returned to the consumer but
 excluded from pattern matching. The `#instructions` and
 `#label` fields below carry free text that no agent would
 match against.
@@ -157,7 +157,7 @@ authenticate with `--key` instead of `--id`.
 
 The intake agent posts a request. The `access` parameter
 restricts who can consume or read it. The `#description`
-field is metadata: passed through to the processing agent but
+field is unmatched: passed through to the processing agent but
 not matchable, since it contains free text.
 
 ```

@@ -12,8 +12,8 @@ name-value pairs). Values may be strings, numbers, booleans,
 null, nested objects, or arrays of atomic values (strings,
 numbers, booleans, null). Arrays may not contain objects or
 other arrays. Properties whose names start with `#` are
-metadata: stored and returned but excluded from matching (see
-Metadata Properties).
+unmatched: stored and returned but excluded from matching (see
+Unmatched Properties).
 
 ACE stores objects in canonical form: keys in lexicographic
 order, no HTML escaping. Two JSON objects that differ only in
@@ -142,22 +142,22 @@ satisfies it.
 The last row fails because the pattern requires branch `d=3`
 at the root, but the object has `d=3` only under `a`.
 
-## Metadata properties
+## Unmatched properties
 
-A property whose name starts with `#` is a metadata property.
-Metadata properties are stored in the object and returned to
+A property whose name starts with `#` is an unmatched property.
+Unmatched properties are stored in the object and returned to
 callers, but they are invisible to pattern matching: no
 branches are generated for them, and they do not count
 against the object leaf limit.
 
 The filter applies at every nesting level. In
 `{"a":{"#note":"x","b":1}}`, the `#note` property is
-metadata regardless of its position; only `a.b` participates
+unmatched regardless of its position; only `a.b` participates
 in matching. A top-level `#` property like
 `{"#id":"abc","type":"task"}` skips the entire subtree rooted
 at that key.
 
-A `#` property in a pattern is an error. Because metadata
+A `#` property in a pattern is an error. Because unmatched
 properties generate no branches, a pattern that references
 one can never add useful constraints.
 
@@ -342,6 +342,6 @@ An object leaf is a scalar value at any nesting depth. Each
 element of an array in an object counts as one leaf:
 `{"a":[1,2,3]}` has three leaves. A pattern leaf is a single
 constraint: a scalar is one leaf, and an array of
-alternatives is one leaf. Metadata properties (names starting
+alternatives is one leaf. Unmatched properties (names starting
 with `#`) do not count as leaves but their values are checked
 against the unmatchable value size limit.

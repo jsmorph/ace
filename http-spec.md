@@ -39,7 +39,7 @@ Request body:
 
 | Field | Required | Purpose |
 |-------|----------|---------|
-| `object` | yes | JSON object to store (`#` properties are metadata; see `spec.md`) |
+| `object` | yes | JSON object to store (`#` properties are unmatched; see `spec.md`) |
 | `access` | no | Access control (see `spec.md`) |
 | `ttl` | no | Time-to-live as ISO 8601 duration (default: 72 hours) |
 
@@ -80,7 +80,7 @@ Response when a match exists (200):
 {"id": "2025-07-14T22:31:05.123456789", "object": {"#id": "job-42", "type": "task", "payload": "compute"}}
 ```
 
-Metadata properties (like `#id`) are returned in the object
+Unmatched properties (like `#id`) are returned in the object
 even though they do not participate in pattern matching.
 
 When explicit deletes are enabled, the response includes a

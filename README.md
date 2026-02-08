@@ -97,9 +97,9 @@ pattern `{}` matches any object.
 The last row fails because the pattern requires branch `d=3`
 at the root, but the object has `d=3` only under `a`.
 
-## Metadata properties
+## Unmatched properties
 
-Properties whose names start with `#` are metadata: stored in
+Properties whose names start with `#` are unmatched: stored in
 the object and returned to callers, but excluded from pattern
 matching. They do not count against the object leaf limit. A
 `#` property in a pattern is an error. See the

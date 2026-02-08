@@ -147,9 +147,9 @@ Lines 101-102 of `spec.md` reference `access.out`, but the
 API definition (lines 55-58) defines the access fields as
 `in` and `rd`. The implementation uses `in` and `rd`.
 
-## Metadata Properties (`#` prefix)
+## Unmatched Properties (`#` prefix)
 
-Properties whose names start with `#` are opaque metadata.
+Properties whose names start with `#` are opaque unmatched data.
 They are stored in the object JSON and returned to callers
 but excluded from all matching. The filter is applied in
 three places: `extractFromObject` (branch.go),
@@ -161,7 +161,7 @@ keys at every recursion level.
 there are no branches to match against. In limits.go,
 `walkObject` delegates `#` properties to `walkMeta`, which
 checks their values against `ObjectUnmatchableValueSize`
-(default 256). Metadata leaves do not count against the
+(default 256). Unmatched leaves do not count against the
 object leaf limit. `walkPattern` rejects `#` properties.
 
 Quamina's `MatchesForEvent` receives the full object JSON
