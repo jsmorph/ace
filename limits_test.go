@@ -131,6 +131,27 @@ func TestValidateObjectMetaNested(t *testing.T) {
 	}
 }
 
+func TestValidateObjectValueTooLarge(t *testing.T) {
+	lim := DefaultLimits()
+	lim.ObjectValueSize = 3
+	err := lim.ValidateObject([]byte(`{"a":"toolong"}`))
+	if err == nil {
+		t.Fatal("expected error for oversized value")
+	}
+	if !strings.Contains(err.Error(), "\"a\"") {
+		t.Fatalf("error should reference field: %v", err)
+	}
+}
+
+func TestValidateObjectArrayValueTooLarge(t *testing.T) {
+	lim := DefaultLimits()
+	lim.ObjectValueSize = 3
+	err := lim.ValidateObject([]byte(`{"a":["toolong"]}`))
+	if err == nil {
+		t.Fatal("expected error for oversized array element")
+	}
+}
+
 func TestValidatePatternOK(t *testing.T) {
 	lim := DefaultLimits()
 	err := lim.ValidatePattern([]byte(`{"a":1}`))
@@ -153,6 +174,45 @@ func TestValidatePatternTooManyLeaves(t *testing.T) {
 	err := lim.ValidatePattern([]byte(`{"a":1,"b":2,"c":3}`))
 	if err == nil {
 		t.Fatal("expected error")
+	}
+}
+
+func TestValidatePatternTooLarge(t *testing.T) {
+	lim := DefaultLimits()
+	lim.PatternSize = 5
+	err := lim.ValidatePattern([]byte(`{"a":1,"b":2}`))
+	if err == nil {
+		t.Fatal("expected error for oversized pattern")
+	}
+	if !strings.Contains(err.Error(), "pattern size") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidatePatternAtomicTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.PatternAtomicLength = 3
+	err := lim.ValidatePattern([]byte(`{"a":"toolong"}`))
+	if err == nil {
+		t.Fatal("expected error for oversized pattern value")
+	}
+}
+
+func TestValidatePatternArrayAtomicTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.PatternAtomicLength = 3
+	err := lim.ValidatePattern([]byte(`{"a":["toolong"]}`))
+	if err == nil {
+		t.Fatal("expected error for oversized pattern array element")
+	}
+}
+
+func TestValidatePatternPropertyNameTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.PropertySize = 2
+	err := lim.ValidatePattern([]byte(`{"abc":1}`))
+	if err == nil {
+		t.Fatal("expected error for oversized property name in pattern")
 	}
 }
 
@@ -263,6 +323,42 @@ func TestLimitsOverlay(t *testing.T) {
 	}
 	if l.PatternSize != 2048 {
 		t.Fatalf("PatternSize = %d, want 2048 (default preserved)", l.PatternSize)
+	}
+}
+
+func TestValidateAccessTooLarge(t *testing.T) {
+	lim := DefaultLimits()
+	lim.AccessSize = 10
+	err := lim.ValidateAccess([]byte(`{"in":["alice","bob"]}`))
+	if err == nil {
+		t.Fatal("expected error for oversized access")
+	}
+	if !strings.Contains(err.Error(), "access size") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateAccessIDTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.IDSize = 3
+	err := lim.ValidateAccess([]byte(`{"in":["toolong"]}`))
+	if err == nil {
+		t.Fatal("expected error for oversized access ID")
+	}
+	if !strings.Contains(err.Error(), "access in ID") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateCallerIDTooLong(t *testing.T) {
+	lim := DefaultLimits()
+	lim.IDSize = 3
+	err := lim.ValidateCallerID("toolong")
+	if err == nil {
+		t.Fatal("expected error for oversized caller ID")
+	}
+	if !strings.Contains(err.Error(), "caller ID") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
