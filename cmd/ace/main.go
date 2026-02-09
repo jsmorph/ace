@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"strings"
@@ -138,8 +139,10 @@ func cmdServe(args []string) {
 				if _, err := space.DeleteExpired(); err != nil {
 					log.Printf("deleteExpired: %v", err)
 				}
-				if _, err := space.DeleteExpiredIdentities(); err != nil {
-					log.Printf("deleteExpiredIdentities: %v", err)
+				if rand.IntN(10) == 0 {
+					if _, err := space.DeleteExpiredIdentities(); err != nil {
+						log.Printf("deleteExpiredIdentities: %v", err)
+					}
 				}
 			case <-stop:
 				return
