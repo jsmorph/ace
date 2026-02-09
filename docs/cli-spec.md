@@ -31,6 +31,7 @@ Start the HTTP server.
 | `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
 | `--insecure-ids` | false | Allow bare `X-ACE-ID` header without key authentication |
 | `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
+| `--throttle` | 60 | Max requests per minute per IP (0 = unlimited) |
 | `--tls` | (none) | Hostname for automatic TLS via Let's Encrypt |
 | `--tls-cache` | `certs` | Directory for cached TLS certificates |
 

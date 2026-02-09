@@ -11,8 +11,7 @@ thin wrapper that dispatches subcommands.
 
 The pure-Go SQLite driver from
 [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)
-is the only external dependency. It registers itself as the
-`"sqlite"` driver for `database/sql`.
+registers itself as the `"sqlite"` driver for `database/sql`.
 
 Connection configuration (set via DSN pragmas):
 
@@ -269,6 +268,21 @@ ignored when `--tls` is set.
 Certificates are cached on disk in the `--tls-cache` directory
 (default `certs`), using `autocert.DirCache`.  The manager
 handles renewal automatically before expiration.
+
+## Throttling
+
+`--throttle RPM` enables per-IP rate limiting (default 60
+requests per minute).  The implementation uses a
+[token bucket](https://pkg.go.dev/golang.org/x/time/rate)
+per IP address.  The rate is `RPM/60` tokens per second with
+a burst equal to `RPM`, allowing short spikes up to the full
+minute's allowance.  Requests that exceed the limit receive
+HTTP 429.
+
+IP addresses are extracted from `r.RemoteAddr` with the port
+stripped.  A background goroutine removes entries not seen in
+the last five minutes to bound memory.  The map is protected
+by a `sync.Mutex`.
 
 ## Explicit Deletes
 

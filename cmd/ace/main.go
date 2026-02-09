@@ -85,6 +85,7 @@ func cmdServe(args []string) {
 	identityTTLStr := fs.String("identity-ttl", "P40D", "identity expiration (ISO 8601 duration)")
 	tlsHost := fs.String("tls", "", "hostname for automatic TLS via Let's Encrypt")
 	tlsCache := fs.String("tls-cache", "certs", "directory for cached TLS certificates")
+	throttle := fs.Int("throttle", 60, "max requests per minute per IP (0 = unlimited)")
 	fs.Parse(args)
 
 	cfg := ace.DefaultConfig()
@@ -133,7 +134,8 @@ func cmdServe(args []string) {
 		}
 	}()
 
-	stop := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	go func() {
 		ticker := time.NewTicker(cfg.ScavengeInterval)
 		defer ticker.Stop()
@@ -148,14 +150,18 @@ func cmdServe(args []string) {
 						log.Printf("deleteExpiredIdentities: %v", err)
 					}
 				}
-			case <-stop:
+			case <-ctx.Done():
 				return
 			}
 		}
 	}()
-	defer close(stop)
 
-	srv := ace.NewServer(space, *maxWaiters)
+	var handler http.Handler = ace.NewServer(space, *maxWaiters)
+	if *throttle > 0 {
+		t := ace.NewThrottler(handler, *throttle)
+		go t.Run(ctx)
+		handler = t
+	}
 
 	if *tlsHost != "" {
 		m := &autocert.Manager{
@@ -165,7 +171,7 @@ func cmdServe(args []string) {
 		}
 		tlsSrv := &http.Server{
 			Addr:      ":443",
-			Handler:   srv,
+			Handler:   handler,
 			TLSConfig: &tls.Config{GetCertificate: m.GetCertificate},
 		}
 		go func() {
@@ -179,7 +185,7 @@ func cmdServe(args []string) {
 		}
 	} else {
 		log.Printf("listening on %s (blocking=%s, max-waiters=%d, deletes=%v)", *addr, cfg.Blocking, *maxWaiters, cfg.Deletes)
-		if err := http.ListenAndServe(*addr, srv); err != nil {
+		if err := http.ListenAndServe(*addr, handler); err != nil {
 			log.Fatal(err)
 		}
 	}
