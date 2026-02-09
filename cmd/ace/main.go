@@ -11,9 +11,12 @@ import (
 	"io"
 	"log"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/morphism/ace"
@@ -71,6 +74,25 @@ func cmdHelp() {
 	os.Stdout.Write(data)
 }
 
+// drainer wraps an http.Handler with a drain mode: once draining is
+// set, new requests receive 503.  srv.Shutdown tracks in-flight
+// request completion.
+type drainer struct {
+	handler  http.Handler
+	draining atomic.Bool
+}
+
+func (d *drainer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if d.draining.Load() {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Retry-After", "30")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"error":"service updating"}`)
+		return
+	}
+	d.handler.ServeHTTP(w, r)
+}
+
 func cmdServe(args []string) {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	addr := fs.String("addr", "localhost:8000", "listen address")
@@ -86,6 +108,8 @@ func cmdServe(args []string) {
 	tlsHost := fs.String("tls", "", "hostname for automatic TLS via Let's Encrypt")
 	tlsCache := fs.String("tls-cache", "certs", "directory for cached TLS certificates")
 	throttle := fs.Int("throttle", 60, "max requests per minute per IP (0 = unlimited)")
+	updates := fs.String("updates", "", "update source: GitHub releases URL or local directory")
+	updateIntervalStr := fs.String("update-interval", "PT1H", "update check interval (ISO 8601)")
 	fs.Parse(args)
 
 	cfg := ace.DefaultConfig()
@@ -123,6 +147,15 @@ func cmdServe(args []string) {
 		log.Fatalf("parse scavenge interval: %v", err)
 	}
 	cfg.ScavengeInterval = scavengeInterval
+
+	var updateInterval time.Duration
+	if *updates != "" {
+		ui, err := ace.ParseISO8601Duration(*updateIntervalStr)
+		if err != nil {
+			log.Fatalf("parse update-interval: %v", err)
+		}
+		updateInterval = ui
+	}
 
 	space, err := ace.NewSpace(*dbPath, cfg)
 	if err != nil {
@@ -163,13 +196,25 @@ func cmdServe(args []string) {
 		handler = t
 	}
 
+	// When updates are enabled, wrap the handler with a drainer
+	// that rejects new requests during shutdown.  updateDone
+	// receives the new binary path after shutdown completes.
+	var drain *drainer
+	var updateDone chan string
+	if *updates != "" {
+		drain = &drainer{handler: handler}
+		handler = drain
+		updateDone = make(chan string, 1)
+	}
+
+	var srv *http.Server
 	if *tlsHost != "" {
 		m := &autocert.Manager{
 			Cache:      autocert.DirCache(*tlsCache),
 			Prompt:     autocert.AcceptTOS,
 			HostPolicy: autocert.HostWhitelist(*tlsHost),
 		}
-		tlsSrv := &http.Server{
+		srv = &http.Server{
 			Addr:      ":443",
 			Handler:   handler,
 			TLSConfig: &tls.Config{GetCertificate: m.GetCertificate},
@@ -179,16 +224,90 @@ func cmdServe(args []string) {
 				log.Fatal(err)
 			}
 		}()
+	} else {
+		srv = &http.Server{
+			Addr:    *addr,
+			Handler: handler,
+		}
+	}
+
+	if *updates != "" {
+		updater := ace.NewUpdater(*updates, updateInterval, func(binPath string) {
+			log.Printf("update: draining requests")
+			drain.draining.Store(true)
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer shutdownCancel()
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				log.Printf("update: shutdown: %v", err)
+			}
+			log.Printf("update: shutdown complete")
+			updateDone <- binPath
+		})
+		go updater.Run(ctx)
+	}
+
+	if *tlsHost != "" {
 		log.Printf("listening on :443 (tls=%s, blocking=%s, max-waiters=%d, deletes=%v)", *tlsHost, cfg.Blocking, *maxWaiters, cfg.Deletes)
-		if err := tlsSrv.ListenAndServeTLS("", ""); err != nil {
-			log.Fatal(err)
+		if *updates != "" {
+			ln := listenRetry("tcp", ":443")
+			if err := srv.ServeTLS(ln, "", ""); err != http.ErrServerClosed {
+				log.Fatal(err)
+			}
+		} else {
+			if err := srv.ListenAndServeTLS("", ""); err != http.ErrServerClosed {
+				log.Fatal(err)
+			}
 		}
 	} else {
 		log.Printf("listening on %s (blocking=%s, max-waiters=%d, deletes=%v)", *addr, cfg.Blocking, *maxWaiters, cfg.Deletes)
-		if err := http.ListenAndServe(*addr, handler); err != nil {
-			log.Fatal(err)
+		if *updates != "" {
+			ln := listenRetry("tcp", *addr)
+			if err := srv.Serve(ln); err != http.ErrServerClosed {
+				log.Fatal(err)
+			}
+		} else {
+			if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+				log.Fatal(err)
+			}
 		}
 	}
+
+	// If an update triggered the shutdown, wait for the shutdown
+	// goroutine to finish, close the database, then start the new
+	// process.  Serve returns before Shutdown completes (Shutdown
+	// closes the listener first, then waits for handlers), so we
+	// block on updateDone to ensure all handlers have finished
+	// before closing the database.
+	if drain != nil && drain.draining.Load() {
+		binPath := <-updateDone
+		cancel()
+		space.Close()
+		startUpdatedProcess(binPath)
+	}
+}
+
+func startUpdatedProcess(binPath string) {
+	log.Printf("update: starting new process: %s", binPath)
+	cmd := exec.Command(binPath, os.Args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		log.Fatalf("update: start: %v", err)
+	}
+	os.Exit(0)
+}
+
+func listenRetry(network, addr string) net.Listener {
+	for i := range 30 {
+		ln, err := net.Listen(network, addr)
+		if err == nil {
+			return ln
+		}
+		log.Printf("listen %s: %v (attempt %d/30)", addr, err, i+1)
+		time.Sleep(1 * time.Second)
+	}
+	log.Fatalf("listen %s: gave up after 30 attempts", addr)
+	panic("unreachable")
 }
 
 func cliConfig() ace.Config {

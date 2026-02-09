@@ -34,6 +34,8 @@ Start the HTTP server.
 | `--throttle` | 60 | Max requests per minute per IP (0 = unlimited) |
 | `--tls` | (none) | Hostname for automatic TLS via Let's Encrypt |
 | `--tls-cache` | `certs` | Directory for cached TLS certificates |
+| `--updates` | (none) | Update source: GitHub releases URL or local directory |
+| `--update-interval` | `PT1H` | Update check interval (ISO 8601) |
 
 The server deletes expired objects and expired identities at
 the scavenge interval.
@@ -43,6 +45,17 @@ and port 80 for ACME challenges and HTTP-to-HTTPS redirects.
 The `--addr` flag is ignored in this mode.  Certificates are
 obtained automatically from Let's Encrypt and cached in the
 `--tls-cache` directory.
+
+When `--updates` is set, the server polls for a new binary at
+the specified interval.  The source is a GitHub releases URL
+(fetches `URL/latest/download/ace-GOOS-GOARCH`) or a local
+directory containing the binary.  On first check the server
+records the current ETag/modtime as a baseline.  When a change
+is detected, the server downloads the new binary, starts it
+with the same arguments, stops accepting new requests (503),
+waits up to 10 seconds for in-flight requests to complete, and
+exits.  The new process retries its listen call for up to 30
+seconds while the old process drains.
 
 ## ace out
 

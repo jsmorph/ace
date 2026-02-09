@@ -284,6 +284,62 @@ stripped.  A background goroutine removes entries not seen in
 the last five minutes to bound memory.  The map is protected
 by a `sync.Mutex`.
 
+## Automatic Updates
+
+The `Updater` (in `updater.go`) polls a source for new
+binaries.  Two source types:
+
+**URL**: HTTP HEAD to `URL/latest/download/ace-GOOS-GOARCH`
+on each tick.  Tracks `ETag` and `Last-Modified` headers.  On
+change, HTTP GET downloads the binary to a temp file and
+`chmod 0755`.
+
+**Directory**: `os.Stat` on the expected binary path.  Tracks
+the file's modtime.
+
+Both skip the first check to establish a baseline (the
+assumption is that the running binary matches what the source
+currently offers).
+
+The ETag/Last-Modified state is updated only after a
+successful download, so a failed download retries on the next
+check.  If the server provides neither header, the updater
+logs a warning at baseline: change detection requires at least
+one.  GitHub releases URLs redirect to a CDN; the standard
+HTTP client follows redirects, so the ETag and Last-Modified
+come from the CDN.
+
+The update sequence in `main.go`:
+
+1. The `onUpdate` callback (running in the updater goroutine)
+   sets the `drainer` flag so new requests get 503, then
+   calls `http.Server.Shutdown` with a 10-second timeout.
+   `Shutdown` closes the listener, then waits for in-flight
+   handlers to return.  Blocking `In`/`Rd` calls use
+   `r.Context()`, so `Shutdown` cancels them when the
+   deadline expires.  The callback sends the binary path on
+   `updateDone`.
+2. `srv.Serve` returns `ErrServerClosed` in the main
+   goroutine.  The main goroutine checks `drain.draining`:
+   if true, it blocks on `updateDone` to ensure `Shutdown`
+   is complete, then closes the database explicitly and
+   starts the new binary with `os.Args`.
+
+The database is closed before the new process starts.  This
+eliminates any window where two processes write to SQLite
+concurrently.
+
+The new process calls `listenRetry`, which attempts
+`net.Listen` once per second for up to 30 seconds, logging
+each attempt.  The port is free after `Shutdown` closes the
+listener (step 1), so the retry window covers the startup
+delay of the new process.
+
+The `drainer` middleware wraps the handler with an
+`atomic.Bool`.  When draining, new requests receive 503
+with a `Retry-After: 30` header.  The drainer is only
+installed when `--updates` is set.
+
 ## Explicit Deletes
 
 SQS-style visibility timeout for `in` operations. When
