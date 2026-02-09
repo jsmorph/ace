@@ -17,6 +17,7 @@ control, TTL, blocking, and limits.
 | GET | `/stats` | Return storage statistics |
 | POST | `/reg` | Register a client identity |
 | GET | `/regcheck` | Look up a client identity |
+| GET | `/ping` | Return the server's commit hash |
 | GET | `/doc` | List embedded documentation |
 | GET | `/doc/{name}` | Return a documentation file |
 
@@ -226,6 +227,20 @@ Example response for key lookup (200):
 ```
 
 Returns 404 if the identity does not exist.
+
+## GET /ping
+
+Returns the git commit hash of the running server binary.
+The hash is embedded at build time via `-ldflags`.
+
+Response (200):
+
+```json
+{"commit": "a1b2c3d4e5f6..."}
+```
+
+The `commit` field is empty if the binary was built without
+`-ldflags "-X github.com/morphism/ace.Commit=..."`.
 
 ## GET /doc
 

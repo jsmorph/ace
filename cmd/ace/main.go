@@ -50,6 +50,10 @@ func main() {
 		cmdReg(os.Args[2:])
 	case "regcheck":
 		cmdRegCheck(os.Args[2:])
+	case "ping":
+		cmdPing(os.Args[2:])
+	case "version":
+		cmdPing(os.Args[2:])
 	case "test":
 		cmdTest(os.Args[2:])
 	case "doc":
@@ -63,7 +67,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: ace <serve|out|in|rd|match|del|reg|regcheck|stats|expire|test|doc|help> [flags]\n")
+	fmt.Fprintf(os.Stderr, "usage: ace <serve|out|in|rd|match|del|reg|regcheck|stats|ping|version|expire|test|doc|help> [flags]\n")
 }
 
 func cmdHelp() {
@@ -454,6 +458,33 @@ func remoteDel(serverURL string, deleteID string) {
 
 func remoteStats(serverURL string) {
 	resp, err := http.Get(serverURL + "/stats")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	checkHTTPError(resp)
+	io.Copy(os.Stdout, resp.Body)
+}
+
+func cmdPing(args []string) {
+	fs := flag.NewFlagSet("ping", flag.ExitOnError)
+	server := fs.String("server", "", "ACE server URL (default: $ACE_URL)")
+	fs.Parse(args)
+
+	if url := resolveServer(*server); url != "" {
+		remotePing(url)
+		return
+	}
+
+	if err := json.NewEncoder(os.Stdout).Encode(struct {
+		Commit string `json:"commit"`
+	}{Commit: ace.Commit}); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func remotePing(serverURL string) {
+	resp, err := http.Get(serverURL + "/ping")
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -7,10 +7,10 @@ control, TTL, blocking, and limits.
 All subcommands accept `--db` (default: `ace.db`) to specify
 the SQLite database file.
 
-The `out`, `in`, `rd`, `del`, and `stats` subcommands accept
-`--server` to specify an ACE server URL (e.g.,
-`http://localhost:8000`). If `--server` is not given, the
-`$ACE_URL` environment variable is used when set. When a
+The `out`, `in`, `rd`, `del`, `stats`, `ping`, and `version`
+subcommands accept `--server` to specify an ACE server URL
+(e.g., `http://localhost:8000`).  If `--server` is not given,
+the `$ACE_URL` environment variable is used when set.  When a
 server URL is active, the command sends HTTP requests to the
 server instead of opening a local database, and `--db` is
 ignored.
@@ -185,6 +185,26 @@ Example output for key lookup:
 ```json
 {"id": "ace:d4e5f6...64hex", "name": "acen:alice"}
 ```
+
+## ace ping
+
+Print the server's commit hash.  When `--server` is given (or
+`$ACE_URL` is set), queries the remote `/ping` endpoint.
+Otherwise prints the commit hash embedded in the local binary.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--server` | `$ACE_URL` | ACE server URL |
+
+Output:
+
+```json
+{"commit": "a1b2c3d4..."}
+```
+
+## ace version
+
+Alias for `ace ping`.
 
 ## ace expire
 

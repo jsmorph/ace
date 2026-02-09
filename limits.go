@@ -76,15 +76,15 @@ type Limits struct {
 	ObjectValueSize            int           `json:"object_value_size"`
 	ObjectUnmatchableValueSize int           `json:"object_unmatchable_value_size"`
 	ObjectLeaves               int           `json:"object_leaves"`
-	ObjectArrayLength   int           `json:"object_array_length"`
-	PatternSize         int           `json:"pattern_size"`
-	PatternLeaves       int           `json:"pattern_leaves"`
-	PatternArrayLength  int           `json:"pattern_array_length"`
-	PatternAtomicLength int           `json:"pattern_atomic_length"`
-	AccessSize          int           `json:"access_size"`
-	AccessLength        int           `json:"access_length"`
-	TTLMax              time.Duration `json:"ttl_max"`
-	IDSize              int           `json:"id_size"`
+	ObjectArrayLength          int           `json:"object_array_length"`
+	PatternSize                int           `json:"pattern_size"`
+	PatternLeaves              int           `json:"pattern_leaves"`
+	PatternArrayLength         int           `json:"pattern_array_length"`
+	PatternAtomicLength        int           `json:"pattern_atomic_length"`
+	AccessSize                 int           `json:"access_size"`
+	AccessLength               int           `json:"access_length"`
+	TTLMax                     time.Duration `json:"ttl_max"`
+	IDSize                     int           `json:"id_size"`
 }
 
 // DefaultLimits returns the default limits.
@@ -95,15 +95,15 @@ func DefaultLimits() Limits {
 		ObjectValueSize:            128,
 		ObjectUnmatchableValueSize: 256,
 		ObjectLeaves:               8,
-		ObjectArrayLength:   4,
-		PatternSize:         2048,
-		PatternLeaves:       4,
-		PatternArrayLength:  4,
-		PatternAtomicLength: 128,
-		AccessSize:          1024,
-		AccessLength:        16,
-		TTLMax:              7 * 24 * time.Hour,
-		IDSize:              128,
+		ObjectArrayLength:          4,
+		PatternSize:                2048,
+		PatternLeaves:              4,
+		PatternArrayLength:         4,
+		PatternAtomicLength:        128,
+		AccessSize:                 1024,
+		AccessLength:               16,
+		TTLMax:                     7 * 24 * time.Hour,
+		IDSize:                     128,
 	}
 }
 

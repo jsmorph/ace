@@ -340,6 +340,14 @@ The `drainer` middleware wraps the handler with an
 with a `Retry-After: 30` header.  The drainer is only
 installed when `--updates` is set.
 
+## Commit Hash and Ping
+
+`ace.Commit` is a package-level `string` variable set at build
+time via `go build -ldflags "-X github.com/morphism/ace.Commit=$(git rev-parse HEAD)"`.
+The `/ping` HTTP endpoint and the `ace ping` / `ace version`
+CLI subcommands return it as `{"commit":"..."}`.  When the
+binary is built without `-ldflags`, the field is empty.
+
 ## Explicit Deletes
 
 SQS-style visibility timeout for `in` operations. When

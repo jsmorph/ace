@@ -110,8 +110,11 @@ matching. They do not count against the object leaf limit. A
 Build the binary:
 
 ```
-go build -o ace ./cmd/ace
+make build
 ```
+
+This embeds the git commit hash in the binary (reported by
+`ace ping` and `GET /ping`).
 
 Start a server:
 
@@ -193,6 +196,9 @@ ace test --writers 8 --readers 8 --requests 200
 | GET | `/stats` | Return storage statistics |
 | POST | `/reg` | Register a client identity |
 | GET | `/regcheck` | Look up a client identity |
+| GET | `/ping` | Return the server's commit hash |
+| GET | `/doc` | List embedded documentation |
+| GET | `/doc/{name}` | Return a documentation file |
 
 See the [HTTP API specification](docs/http-spec.md) for
 request/response formats and error codes.
@@ -253,12 +259,11 @@ arrive in time, the object reappears in the space. See the
 
 ## Configuration
 
-The server accepts `--blocking` (`polling` or `notify`),
-`--scavenge` (expiration interval), `--max-waiters`
-(concurrent blocking client limit), and `--limits` (JSON file
-overriding default limits). The [CLI reference](docs/cli-spec.md)
-documents all flags; the [specification](docs/spec.md) lists
-limits and their defaults.
+The server accepts flags for blocking mode, scavenge interval,
+max waiters, limits, TLS, per-IP throttling, and automatic
+updates.  The [CLI reference](docs/cli-spec.md) documents all
+flags; the [specification](docs/spec.md) lists limits and
+their defaults.
 
 ## Event pattern matching
 
@@ -285,11 +290,14 @@ up to execute their queries.
 
 ## Dependencies
 
-ACE has two external dependencies.
 [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite)
 is a pure-Go SQLite implementation (no CGo).
 [Quamina](https://pkg.go.dev/quamina.net/go/quamina) provides
 content-based pattern matching for blocking notifications.
+[golang.org/x/crypto/acme/autocert](https://pkg.go.dev/golang.org/x/crypto/acme/autocert)
+manages TLS certificates from Let's Encrypt.
+[golang.org/x/time/rate](https://pkg.go.dev/golang.org/x/time/rate)
+provides token-bucket rate limiting for per-IP throttling.
 
 ## Roadmap
 

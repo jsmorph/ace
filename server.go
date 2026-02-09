@@ -10,6 +10,9 @@ import (
 	"time"
 )
 
+// Commit is the git commit hash, set at build time via ldflags.
+var Commit string
+
 // Server exposes a Space over HTTP.
 type Server struct {
 	space   *Space
@@ -34,6 +37,7 @@ func NewServer(space *Space, maxWaiters int) *Server {
 	mux.HandleFunc("/stats", srv.handleStats)
 	mux.HandleFunc("/reg", srv.handleReg)
 	mux.HandleFunc("/regcheck", srv.handleRegCheck)
+	mux.HandleFunc("/ping", handlePing)
 	mux.HandleFunc("/doc", handleDocIndex)
 	mux.HandleFunc("/doc/", handleDocFile)
 	srv.mux = mux
@@ -460,6 +464,18 @@ func httpStatusForError(err error) int {
 		return http.StatusBadRequest
 	}
 	return http.StatusInternalServerError
+}
+
+func handlePing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+	if err := writeJSON(w, http.StatusOK, struct {
+		Commit string `json:"commit"`
+	}{Commit: Commit}); err != nil {
+		log.Printf("handlePing: write response: %v", err)
+	}
 }
 
 const docSummary = "ACE is a coordination service for software agents based on the tuple-space model."
