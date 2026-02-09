@@ -45,7 +45,7 @@ three realistic scenarios.
 
 ## Operations
 
-ACE provides four operations borrowed from the tuple-space
+ACE provides three operations borrowed from the tuple-space
 tradition.
 
 `out(object, access, ttl)` writes an object into the space.
@@ -60,13 +60,13 @@ cursor-style iteration.
 `rd(callerID, pattern, wait, since)` works like `in` but
 does not remove the object.
 
-`del(delete_id)` permanently deletes an object previously
-marked invisible by `in` when explicit deletes are enabled
-(see Explicit Deletes below).
-
 Each object receives a unique nanosecond-resolution timestamp
 as its identifier. Operations return the earliest matching
 object first.
+
+ACE also supports `del(delete_id)`, which permanently deletes an
+object previously marked invisible by `in` when explicit deletes are
+enabled (see Explicit Deletes below).
 
 ## Pattern matching
 
