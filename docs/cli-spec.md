@@ -4,16 +4,18 @@ This document specifies the `ace` command-line interface. See
 `spec.md` for the core operations, pattern matching, access
 control, TTL, blocking, and limits.
 
-All subcommands accept `--db` (default: `ace.db`) to specify
-the SQLite database file.
+Subcommands that open a database accept `--db` (default:
+`ace.db`) to specify the SQLite file.  Subcommands that do
+not use a database (`match`, `ping`, `version`, `test`,
+`doc`, `help`) ignore `--db`.
 
-The `out`, `in`, `rd`, `del`, `stats`, `ping`, and `version`
-subcommands accept `--server` to specify an ACE server URL
-(e.g., `http://localhost:8000`).  If `--server` is not given,
-the `$ACE_URL` environment variable is used when set.  When a
-server URL is active, the command sends HTTP requests to the
-server instead of opening a local database, and `--db` is
-ignored.
+The `out`, `in`, `rd`, `del`, `stats`, `reg`, `regcheck`,
+`ping`, and `version` subcommands accept `--server` to
+specify an ACE server URL (e.g., `http://localhost:8000`).
+If `--server` is not given, the `$ACE_URL` environment
+variable is used when set.  When a server URL is active, the
+command sends HTTP requests to the server instead of opening
+a local database, and `--db` is ignored.
 
 ## ace serve
 
@@ -37,8 +39,9 @@ Start the HTTP server.
 | `--updates` | (none) | Update source: GitHub releases URL or local directory |
 | `--update-interval` | `PT1H` | Update check interval (ISO 8601) |
 
-The server deletes expired objects and expired identities at
-the scavenge interval.
+The server deletes expired objects at each scavenge interval
+and purges expired identities with 1-in-10 probability per
+tick.
 
 When `--tls` is set, the server listens on port 443 for HTTPS
 and port 80 for ACME challenges and HTTP-to-HTTPS redirects.
@@ -51,11 +54,12 @@ the specified interval.  The source is a GitHub releases URL
 (fetches `URL/latest/download/ace-GOOS-GOARCH`) or a local
 directory containing the binary.  On first check the server
 records the current ETag/modtime as a baseline.  When a change
-is detected, the server downloads the new binary, starts it
-with the same arguments, stops accepting new requests (503),
-waits up to 10 seconds for in-flight requests to complete, and
-exits.  The new process retries its listen call for up to 30
-seconds while the old process drains.
+is detected, the server downloads the new binary, stops
+accepting new requests (503), waits up to 10 seconds for
+in-flight requests to complete, closes the database, starts
+the new binary with the same arguments, and exits.  The new
+process retries its listen call for up to 30 seconds while
+the old process finishes.
 
 ## ace out
 
@@ -243,5 +247,6 @@ details.
 | `--writers` | 4 | Concurrent writer goroutines |
 | `--readers` | 4 | Concurrent reader goroutines |
 | `--requests` | 100 | Requests per writer |
+| `--wait` | 2 | Blocking read timeout (seconds) |
 | `--blocking` | `notify` | Blocking implementation |
 | `--max-waiters` | 0 | Max concurrent blocking clients |

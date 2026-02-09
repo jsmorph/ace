@@ -279,7 +279,7 @@ object enters the space, Quamina identifies which waiting
 clients have patterns that match it, and those clients wake
 up to execute their queries.
 
-## Specifications
+## Documentation
 
 | Document | Scope |
 |----------|-------|
@@ -289,6 +289,7 @@ up to execute their queries.
 | [Usage guide](docs/guide.md) | Worked examples for three scenarios |
 | [Related systems](docs/related.md) | Real-world analogs to the tuple-space model |
 | [Pattern extensions](docs/extensions.md) | Numeric and string inequality matching via Quamina fork |
+| [Overview](docs/skill.md) | Summary for agents and `ace help` output |
 
 ## Dependencies
 

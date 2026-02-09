@@ -64,11 +64,11 @@ at `/doc`:
 | Path | Content |
 |------|---------|
 | `/doc` | Index of available documents |
-| `/doc/spec.md` | Operations, pattern matching, access, TTL, limits |
-| `/doc/http-spec.md` | HTTP endpoints, request/response formats, error codes |
-| `/doc/cli-spec.md` | CLI subcommands and flags |
-| `/doc/guide.md` | Worked examples for common coordination patterns |
-| `/doc/skill.md` | This document |
+| `/doc/docs/spec.md` | Operations, pattern matching, access, TTL, limits |
+| `/doc/docs/http-spec.md` | HTTP endpoints, request/response formats, error codes |
+| `/doc/docs/cli-spec.md` | CLI subcommands and flags |
+| `/doc/docs/guide.md` | Worked examples for common coordination patterns |
+| `/doc/docs/skill.md` | This document |
 
 From the command line: `ace doc` lists documents,
 `ace doc spec.md` prints one.

@@ -247,9 +247,10 @@ transaction helper.
 ### Identity expiration
 
 `DeleteExpiredIdentities` removes rows where `last_active` is
-older than `now - IdentityTTL`. The scavenger calls this on
-the same interval as object expiration. The default TTL of 40
-days accommodates intermittent clients.
+older than `now - IdentityTTL`.  The scavenger runs this with
+1-in-10 probability at each scavenge tick, so on average it
+executes every 10 intervals.  The default TTL of 40 days
+accommodates intermittent clients.
 
 ## TLS
 

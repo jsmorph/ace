@@ -251,10 +251,11 @@ documentation files.
 ACE is a coordination service for software agents based on the tuple-space model.
 
   /doc/README.md
-  /doc/spec.md
-  /doc/http-spec.md
-  /doc/cli-spec.md
-  /doc/guide.md
+  /doc/docs/spec.md
+  /doc/docs/http-spec.md
+  /doc/docs/cli-spec.md
+  /doc/docs/guide.md
+  /doc/docs/skill.md
 ```
 
 ## GET /doc/{name}
@@ -275,8 +276,9 @@ body:
 |--------|---------|
 | 400 | Invalid request: malformed JSON, missing fields, or limit violations |
 | 405 | Wrong HTTP method for the endpoint |
+| 429 | Rate limit exceeded (see `--throttle`) |
 | 500 | Internal error |
-| 503 | Too many waiting clients (see max waiters) |
+| 503 | Too many waiting clients, or service updating during an automatic update |
 
 ## Max waiters
 
