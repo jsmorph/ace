@@ -156,16 +156,9 @@ curl -X POST http://localhost:8000/in \
   -d '{"pattern":{"type":"task"},"wait":"10s"}'
 ```
 
-Test whether an object matches a pattern (no database
-required):
-
-```
-ace match --object '{"type":"task","priority":1}' \
-  --pattern '{"type":"task"}'
-```
-
-The remaining CLI commands operate directly on the database
-without the HTTP server:
+The CLI commands operate on a local database by default.
+With `--server` (or the `$ACE_URL` environment variable),
+they send requests to a remote ACE server instead:
 
 ```
 ace out --object '{"type":"task","payload":"compute"}'
@@ -173,6 +166,15 @@ ace rd --pattern '{"type":"task"}'
 ace in --pattern '{"type":"task"}'
 ace del --delete-id <id>
 ace stats
+ace ping
+```
+
+`ace match` tests a pattern locally without a database or
+server:
+
+```
+ace match --object '{"type":"task","priority":1}' \
+  --pattern '{"type":"task"}'
 ```
 
 The built-in stress test launches concurrent writers and
