@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"github.com/morphism/ace"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 func main() {
@@ -81,6 +83,8 @@ func cmdServe(args []string) {
 	visTimeout := fs.String("visibility-timeout", "PT30S", "visibility timeout (ISO 8601 duration)")
 	insecureIDs := fs.Bool("insecure-ids", false, "allow bare X-ACE-ID header (no key required)")
 	identityTTLStr := fs.String("identity-ttl", "P40D", "identity expiration (ISO 8601 duration)")
+	tlsHost := fs.String("tls", "", "hostname for automatic TLS via Let's Encrypt")
+	tlsCache := fs.String("tls-cache", "certs", "directory for cached TLS certificates")
 	fs.Parse(args)
 
 	cfg := ace.DefaultConfig()
@@ -152,9 +156,32 @@ func cmdServe(args []string) {
 	defer close(stop)
 
 	srv := ace.NewServer(space, *maxWaiters)
-	log.Printf("listening on %s (blocking=%s, max-waiters=%d, deletes=%v)", *addr, cfg.Blocking, *maxWaiters, cfg.Deletes)
-	if err := http.ListenAndServe(*addr, srv); err != nil {
-		log.Fatal(err)
+
+	if *tlsHost != "" {
+		m := &autocert.Manager{
+			Cache:      autocert.DirCache(*tlsCache),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist(*tlsHost),
+		}
+		tlsSrv := &http.Server{
+			Addr:      ":443",
+			Handler:   srv,
+			TLSConfig: &tls.Config{GetCertificate: m.GetCertificate},
+		}
+		go func() {
+			if err := http.ListenAndServe(":80", m.HTTPHandler(nil)); err != nil {
+				log.Fatal(err)
+			}
+		}()
+		log.Printf("listening on :443 (tls=%s, blocking=%s, max-waiters=%d, deletes=%v)", *tlsHost, cfg.Blocking, *maxWaiters, cfg.Deletes)
+		if err := tlsSrv.ListenAndServeTLS("", ""); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		log.Printf("listening on %s (blocking=%s, max-waiters=%d, deletes=%v)", *addr, cfg.Blocking, *maxWaiters, cfg.Deletes)
+		if err := http.ListenAndServe(*addr, srv); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 

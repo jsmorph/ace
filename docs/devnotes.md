@@ -252,6 +252,24 @@ older than `now - IdentityTTL`. The scavenger calls this on
 the same interval as object expiration. The default TTL of 40
 days accommodates intermittent clients.
 
+## TLS
+
+`--tls HOSTNAME` enables automatic certificate management via
+[autocert](https://pkg.go.dev/golang.org/x/crypto/acme/autocert).
+The `autocert.Manager` obtains and renews Let's Encrypt
+certificates for the specified hostname.  `HostWhitelist`
+restricts issuance to the single configured hostname.
+
+The server binds two listeners: port 443 for HTTPS (using
+`tls.Config` from `m.GetCertificate`) and port 80 for HTTP-01
+challenge responses and HTTPS redirects (via `m.HTTPHandler`).
+Both ports are required by the ACME protocol, so `--addr` is
+ignored when `--tls` is set.
+
+Certificates are cached on disk in the `--tls-cache` directory
+(default `certs`), using `autocert.DirCache`.  The manager
+handles renewal automatically before expiration.
+
 ## Explicit Deletes
 
 SQS-style visibility timeout for `in` operations. When

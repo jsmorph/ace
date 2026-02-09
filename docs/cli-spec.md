@@ -31,9 +31,17 @@ Start the HTTP server.
 | `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
 | `--insecure-ids` | false | Allow bare `X-ACE-ID` header without key authentication |
 | `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
+| `--tls` | (none) | Hostname for automatic TLS via Let's Encrypt |
+| `--tls-cache` | `certs` | Directory for cached TLS certificates |
 
 The server deletes expired objects and expired identities at
 the scavenge interval.
+
+When `--tls` is set, the server listens on port 443 for HTTPS
+and port 80 for ACME challenges and HTTP-to-HTTPS redirects.
+The `--addr` flag is ignored in this mode.  Certificates are
+obtained automatically from Let's Encrypt and cached in the
+`--tls-cache` directory.
 
 ## ace out
 
