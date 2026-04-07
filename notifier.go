@@ -97,24 +97,38 @@ func ToQuaminaPattern(acePattern json.RawMessage) (json.RawMessage, error) {
 	if err := json.Unmarshal(acePattern, &obj); err != nil {
 		return nil, err
 	}
-	converted := convertToQuamina(obj)
+	converted, err := convertToQuamina(obj)
+	if err != nil {
+		return nil, err
+	}
 	return json.Marshal(converted)
 }
 
-func convertToQuamina(obj map[string]interface{}) map[string]interface{} {
+func convertToQuamina(obj map[string]interface{}) (map[string]interface{}, error) {
 	result := make(map[string]interface{}, len(obj))
 	for k, v := range obj {
 		if strings.HasPrefix(k, "#") {
 			continue
 		}
+		property, err := parsePatternProperty(k)
+		if err != nil {
+			return nil, err
+		}
+		if property.Embeddings != nil {
+			return nil, fmt.Errorf("pattern uses embeddings matching; notifier does not support it")
+		}
 		switch val := v.(type) {
 		case map[string]interface{}:
-			result[k] = convertToQuamina(val)
+			converted, err := convertToQuamina(val)
+			if err != nil {
+				return nil, err
+			}
+			result[property.Name] = converted
 		case []interface{}:
-			result[k] = val
+			result[property.Name] = val
 		default:
-			result[k] = []interface{}{val}
+			result[property.Name] = []interface{}{val}
 		}
 	}
-	return result
+	return result, nil
 }

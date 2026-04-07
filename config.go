@@ -22,6 +22,7 @@ type Config struct {
 	DBOperationTimeMonitorLimit time.Duration `json:"db_operation_time_monitor_limit"`
 	InsecureIDs                 bool          `json:"insecure_ids"`
 	IdentityTTL                 time.Duration `json:"identity_ttl"`
+	EmbeddingsURL               string        `json:"embeddings_url"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -33,5 +34,6 @@ func DefaultConfig() Config {
 		VisibilityTimeout:           30 * time.Second,
 		DBOperationTimeMonitorLimit: time.Second,
 		IdentityTTL:                 40 * 24 * time.Hour,
+		EmbeddingsURL:               defaultEmbeddingsURL,
 	}
 }

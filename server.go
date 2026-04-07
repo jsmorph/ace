@@ -287,7 +287,12 @@ func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ok, err := Match(req.Object, req.Pattern)
+	parsed, err := ParsePattern(req.Pattern)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	ok, err := matchWithProvider(r.Context(), req.Object, parsed, srv.space.embedder)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

@@ -23,6 +23,8 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+var compareEmbeddings = ace.CompareEmbeddingsAtURL
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -40,6 +42,8 @@ func main() {
 		cmdRd(os.Args[2:])
 	case "match":
 		cmdMatchTest(os.Args[2:])
+	case "embcmp":
+		cmdEmbCmp(os.Args[2:])
 	case "del":
 		cmdDel(os.Args[2:])
 	case "stats":
@@ -67,7 +71,7 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: ace <serve|out|in|rd|match|del|reg|regcheck|stats|ping|version|expire|test|doc|help> [flags]\n")
+	fmt.Fprintf(os.Stderr, "usage: ace <serve|out|in|rd|match|embcmp|del|reg|regcheck|stats|ping|version|expire|test|doc|help> [flags]\n")
 }
 
 func cmdHelp() {
@@ -107,6 +111,7 @@ func cmdServe(args []string) {
 	maxWaiters := fs.Int("max-waiters", 0, "max concurrent blocking clients (0 = unlimited)")
 	deletes := fs.Bool("deletes", false, "enable explicit deletes (visibility timeout)")
 	visTimeout := fs.String("visibility-timeout", "PT30S", "visibility timeout (ISO 8601 duration)")
+	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
 	insecureIDs := fs.Bool("insecure-ids", false, "allow bare X-ACE-ID header (no key required)")
 	identityTTLStr := fs.String("identity-ttl", "P40D", "identity expiration (ISO 8601 duration)")
 	tlsHost := fs.String("tls", "", "hostname for automatic TLS via Let's Encrypt")
@@ -139,6 +144,9 @@ func cmdServe(args []string) {
 
 	cfg.Blocking = ace.BlockingMode(*blocking)
 	cfg.InsecureIDs = *insecureIDs
+	if *embeddingsURL != "" {
+		cfg.EmbeddingsURL = *embeddingsURL
+	}
 
 	identityTTL, err := ace.ParseISO8601Duration(*identityTTLStr)
 	if err != nil {
@@ -619,6 +627,7 @@ func cmdMatch(args []string, remove bool) {
 	key := fs.String("key", "", "client key (default: $ACE_CLIENT_KEY)")
 	waitStr := fs.String("wait", "", "block duration (integer seconds, ISO 8601, or Go duration)")
 	deletes := fs.Bool("deletes", false, "enable explicit deletes")
+	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
 	fs.Parse(args)
 
 	var wait time.Duration
@@ -649,6 +658,9 @@ func cmdMatch(args []string, remove bool) {
 		if *deletes {
 			log.Printf("warning: --deletes is ignored in remote mode; the server's configuration controls explicit deletes")
 		}
+		if *embeddingsURL != "" {
+			log.Printf("warning: --embeddings-url is ignored in remote mode; the server's configuration controls the embeddings endpoint")
+		}
 		remoteMatch(url, pat, *callerID, resolveClientKey(*key), wait, *since, remove)
 		return
 	}
@@ -656,6 +668,9 @@ func cmdMatch(args []string, remove bool) {
 	cfg := cliConfig()
 	if *deletes {
 		cfg.Deletes = true
+	}
+	if *embeddingsURL != "" {
+		cfg.EmbeddingsURL = *embeddingsURL
 	}
 
 	space, err := ace.NewSpace(*dbPath, cfg)
@@ -771,6 +786,7 @@ func cmdMatchTest(args []string) {
 	fs := flag.NewFlagSet("match", flag.ExitOnError)
 	object := fs.String("object", "", "JSON object")
 	pattern := fs.String("pattern", "", "JSON pattern")
+	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
 	fs.Parse(args)
 
 	if *object == "" {
@@ -780,7 +796,7 @@ func cmdMatchTest(args []string) {
 		log.Fatal("--pattern is required")
 	}
 
-	ok, err := ace.Match(json.RawMessage(*object), json.RawMessage(*pattern))
+	ok, err := ace.MatchWithEmbeddingsURL(json.RawMessage(*object), json.RawMessage(*pattern), *embeddingsURL)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -790,6 +806,43 @@ func cmdMatchTest(args []string) {
 	}{Match: ok}); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func cmdEmbCmp(args []string) {
+	fs := flag.NewFlagSet("embcmp", flag.ExitOnError)
+	query := fs.String("query", "", "query text")
+	text := fs.String("text", "", "candidate text")
+	metric := fs.String("metric", ace.DefaultEmbeddingMetric, "distance metric: cosine, euclidean, sqeuclidean")
+	threshold := fs.Float64("threshold", ace.DefaultEmbeddingThreshold, "distance threshold")
+	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
+	fs.Parse(args)
+
+	if *query == "" {
+		log.Fatal("--query is required")
+	}
+	if *text == "" {
+		log.Fatal("--text is required")
+	}
+
+	if err := runEmbCmp(os.Stdout, *query, *text, *metric, *threshold, *embeddingsURL); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runEmbCmp(w io.Writer, query, object, metric string, threshold float64, endpoint string) error {
+	comparison, err := compareEmbeddings(context.Background(), query, object, metric, endpoint)
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(w).Encode(struct {
+		*ace.EmbeddingComparison
+		Threshold float64 `json:"threshold"`
+		Match     bool    `json:"match"`
+	}{
+		EmbeddingComparison: comparison,
+		Threshold:           threshold,
+		Match:               comparison.Distance < threshold,
+	})
 }
 
 func cmdExpire(args []string) {

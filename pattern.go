@@ -12,32 +12,83 @@ type PatternBranch struct {
 	Alternatives []string
 }
 
-// ExtractPatternBranches returns the branches for a JSON pattern.
-func ExtractPatternBranches(data []byte) ([]PatternBranch, error) {
-	var obj map[string]interface{}
-	if err := json.Unmarshal(data, &obj); err != nil {
-		return nil, fmt.Errorf("pattern is not a JSON object: %w", err)
-	}
-	var branches []PatternBranch
-	if err := extractPatternFromObject(obj, nil, &branches); err != nil {
-		return nil, err
-	}
-	return branches, nil
+// ParsedPattern separates exact branch matches from embeddings predicates.
+type ParsedPattern struct {
+	Exact      []PatternBranch
+	Embeddings []embeddingPredicate
 }
 
-func extractPatternFromObject(obj map[string]interface{}, path []string, out *[]PatternBranch) error {
+func (p ParsedPattern) HasEmbeddings() bool {
+	return len(p.Embeddings) > 0
+}
+
+type patternProperty struct {
+	Name       string
+	Embeddings *embeddingSpec
+}
+
+type embeddingSpec struct {
+	Metric    embeddingMetric
+	Threshold float64
+}
+
+// ExtractPatternBranches returns the branches for a JSON pattern.
+func ExtractPatternBranches(data []byte) ([]PatternBranch, error) {
+	parsed, err := ParsePattern(data)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.HasEmbeddings() {
+		return nil, fmt.Errorf("pattern uses embeddings matching")
+	}
+	return parsed.Exact, nil
+}
+
+// ParsePattern parses a JSON pattern into exact and embeddings predicates.
+func ParsePattern(data []byte) (ParsedPattern, error) {
+	var obj map[string]interface{}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return ParsedPattern{}, fmt.Errorf("pattern is not a JSON object: %w", err)
+	}
+	var parsed ParsedPattern
+	if err := extractPatternFromObject(obj, nil, nil, &parsed); err != nil {
+		return ParsedPattern{}, err
+	}
+	return parsed, nil
+}
+
+func extractPatternFromObject(obj map[string]interface{}, rawPath, branchPath []string, out *ParsedPattern) error {
 	for k, v := range obj {
-		if strings.HasPrefix(k, "#") {
-			return fmt.Errorf("pattern property %q starts with #; metadata properties are not matchable", k)
+		property, err := parsePatternProperty(k)
+		if err != nil {
+			return err
 		}
-		p := append(path[:len(path):len(path)], escapeProperty(k))
+
+		raw := append(rawPath[:len(rawPath):len(rawPath)], property.Name)
+		branch := append(branchPath[:len(branchPath):len(branchPath)], escapeProperty(property.Name))
+
+		if property.Embeddings != nil {
+			query, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("embeddings pattern at %q requires a string value", strings.Join(raw, "."))
+			}
+			out.Embeddings = append(out.Embeddings, embeddingPredicate{
+				Path:      raw,
+				PathText:  strings.Join(raw, "."),
+				Metric:    property.Embeddings.Metric,
+				Threshold: property.Embeddings.Threshold,
+				Query:     query,
+			})
+			continue
+		}
+
 		switch val := v.(type) {
 		case map[string]interface{}:
-			if err := extractPatternFromObject(val, p, out); err != nil {
+			if err := extractPatternFromObject(val, raw, branch, out); err != nil {
 				return err
 			}
 		case []interface{}:
-			prefix := strings.Join(p, ".") + "="
+			prefix := strings.Join(branch, ".") + "="
 			alts := make([]string, len(val))
 			for i, elem := range val {
 				if _, ok := elem.(map[string]interface{}); ok {
@@ -52,21 +103,77 @@ func extractPatternFromObject(obj map[string]interface{}, path []string, out *[]
 				}
 				alts[i] = prefix + leaf
 			}
-			*out = append(*out, PatternBranch{Alternatives: alts})
+			out.Exact = append(out.Exact, PatternBranch{Alternatives: alts})
 		default:
 			leaf, err := encodeLeaf(v)
 			if err != nil {
 				return err
 			}
-			branch := strings.Join(p, ".") + "=" + leaf
-			*out = append(*out, PatternBranch{Alternatives: []string{branch}})
+			out.Exact = append(out.Exact, PatternBranch{
+				Alternatives: []string{strings.Join(branch, ".") + "=" + leaf},
+			})
 		}
 	}
 	return nil
 }
 
+func parsePatternProperty(raw string) (patternProperty, error) {
+	if strings.HasPrefix(raw, "#") {
+		return patternProperty{}, fmt.Errorf(
+			"pattern property %q starts with #; metadata properties are not matchable", raw)
+	}
+
+	name, suffix, hasSuffix := strings.Cut(raw, "~")
+	if !hasSuffix {
+		return patternProperty{Name: raw}, nil
+	}
+	if name == "" {
+		return patternProperty{}, fmt.Errorf("pattern property %q has empty name before ~", raw)
+	}
+	if suffix == "" {
+		return patternProperty{
+				Name: name,
+				Embeddings: &embeddingSpec{
+					Metric:    embeddingMetricCosine,
+					Threshold: DefaultEmbeddingThreshold,
+				},
+			}, nil
+	}
+
+	metricText, thresholdText, ok := strings.Cut(suffix, "<")
+	if !ok || metricText == "" || thresholdText == "" {
+		return patternProperty{}, fmt.Errorf(
+			"pattern property %q has invalid embeddings suffix; use field~ or field~METRIC<threshold>", raw)
+	}
+
+	metric, err := parseEmbeddingMetric(metricText)
+	if err != nil {
+		return patternProperty{}, err
+	}
+	threshold, err := parseEmbeddingThreshold(thresholdText)
+	if err != nil {
+		return patternProperty{}, err
+	}
+
+	return patternProperty{
+		Name: name,
+		Embeddings: &embeddingSpec{
+			Metric:    metric,
+			Threshold: threshold,
+		},
+	}, nil
+}
+
 // BuildMatchQuery constructs the SQL query that finds the earliest matching object.
 func BuildMatchQuery(branches []PatternBranch, accessType string, callerID string, since string, now time.Time) (string, []interface{}) {
+	return buildMatchQuery(branches, accessType, callerID, since, now, true)
+}
+
+func BuildScanQuery(branches []PatternBranch, accessType string, callerID string, since string, now time.Time) (string, []interface{}) {
+	return buildMatchQuery(branches, accessType, callerID, since, now, false)
+}
+
+func buildMatchQuery(branches []PatternBranch, accessType string, callerID string, since string, now time.Time, limitOne bool) (string, []interface{}) {
 	var b strings.Builder
 	var args []interface{}
 
@@ -101,7 +208,10 @@ func BuildMatchQuery(branches []PatternBranch, accessType string, callerID strin
 	b.WriteString(" OR EXISTS (SELECT 1 FROM access a WHERE a.id = o.id AND a.type = ? AND a.iid = ?))")
 	args = append(args, accessType, callerID)
 
-	b.WriteString(" ORDER BY o.id ASC LIMIT 1")
+	b.WriteString(" ORDER BY o.id ASC")
+	if limitOne {
+		b.WriteString(" LIMIT 1")
+	}
 
 	return b.String(), args
 }

@@ -83,6 +83,25 @@ An array in an object produces one branch per element:
 fields in the object do not prevent a match. The empty
 pattern `{}` matches any object.
 
+A property name ending in `~` enables embeddings matching for
+that leaf. The pattern value must be a string, and ACE
+compares it with the string value at the same object path
+using OpenAI embeddings. `field~` uses cosine distance with a
+default threshold of `0.25`, while
+`field~METRIC<threshold` selects an explicit distance metric
+and threshold. The supported metrics are `cosine`,
+`euclidean`, and `sqeuclidean`. ACE uses
+`EMBEDDINGS_API_KEY` when it is set, otherwise
+`OPENAI_API_KEY`. If neither key is set, ACE returns an
+error instead of attempting embeddings matching.
+
+The embeddings client defaults to OpenAI's
+`/v1/embeddings` endpoint, but ACE can point to any compatible
+endpoint. `ace serve` accepts `--embeddings-url` to configure
+the server's embeddings client. Local CLI commands that can
+evaluate embeddings patterns, including `ace in`, `ace rd`,
+`ace match`, and `ace embcmp`, accept the same flag.
+
 | Pattern | Object | Match? |
 |---------|--------|--------|
 | `{"a":1}` | `{"a":1}` | yes |
@@ -122,6 +141,13 @@ Start a server:
 ace serve --addr localhost:8000
 ```
 
+Start a server with an explicit embeddings endpoint:
+
+```
+ace serve --addr localhost:8000 \
+  --embeddings-url https://example.com/v1/embeddings
+```
+
 Write an object:
 
 ```
@@ -140,6 +166,13 @@ Read without removing:
 ```
 curl -X POST http://localhost:8000/rd \
   -d '{"pattern":{"type":"task"}}'
+```
+
+Read with embeddings matching:
+
+```
+curl -X POST http://localhost:8000/rd \
+  -d '{"pattern":{"type":"task","context~":"TexMex food"}}'
 ```
 
 Read and remove:
@@ -175,6 +208,20 @@ server:
 ```
 ace match --object '{"type":"task","priority":1}' \
   --pattern '{"type":"task"}'
+```
+
+`ace embcmp` compares two texts with the same embeddings
+client and distance code used by embeddings-based pattern
+matching. It reports the selected metric and distance, then
+also reports cosine similarity, dot product, and both
+Euclidean distances for the same pair:
+
+```
+ace embcmp --query 'TexMex food' --text 'tacos and queso'
+ace embcmp --query 'TexMex food' --text 'tacos and queso' \
+  --metric euclidean \
+  --threshold 1.0 \
+  --embeddings-url https://example.com/v1/embeddings
 ```
 
 The built-in stress test launches concurrent writers and

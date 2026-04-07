@@ -64,6 +64,14 @@ control adds a clause that checks either no access
 restriction exists for the operation type, or the caller's ID
 appears in the access list.
 
+Embeddings predicates follow a different path. A key ending
+in `~` or `~METRIC<threshold` does not generate SQL branches.
+Instead, ACE uses the exact branches in the pattern to narrow
+the candidate set, then evaluates the embeddings predicates
+in Go against each candidate object in identifier order. This
+preserves FIFO behavior for `rd` and `in` without storing
+embeddings in SQLite.
+
 ## Blocking
 
 Two implementations, selected by `Config.Blocking`:
@@ -95,6 +103,46 @@ avoid holding it while goroutines receive.
 Ace patterns convert to Quamina format by wrapping atomic
 leaves in arrays: `{"a":1}` becomes `{"a":[1]}`. Array
 leaves are already in Quamina format.
+
+Embeddings predicates do not compile into Quamina. The
+notification path would otherwise need to call a remote API
+for every `out`, which would tie commit latency to network
+latency and serialize the entire space behind the single
+SQLite connection. When a pattern contains embeddings
+predicates, blocking reads fall back to polling.
+
+## Embeddings Matching
+
+ACE parses `field~` as an embeddings predicate with cosine
+distance and a default threshold of `0.25`. ACE parses
+`field~METRIC<threshold` as an embeddings predicate with an
+explicit metric and threshold. The current metrics are
+`cosine`, `euclidean`, and `sqeuclidean`. The pattern value
+must be a string. The object value at the same path may be a
+string or an array of strings, and any matching element
+satisfies the predicate.
+
+The OpenAI call uses `POST /v1/embeddings` with model
+`text-embedding-3-small` and `encoding_format: "float"`,
+following the
+[OpenAI embeddings API reference](https://developers.openai.com/api/reference/resources/embeddings/methods/create).
+ACE uses `EMBEDDINGS_API_KEY` when it is set, otherwise
+`OPENAI_API_KEY`. If neither key is set, ACE returns a
+validation error that states that embeddings filtering is
+unavailable. `OPENAI_EMBEDDINGS_MODEL` overrides the default
+model when a deployment needs a different embeddings model.
+`Config.EmbeddingsURL` controls the endpoint URL, and the CLI
+exposes it through `--embeddings-url` on `serve`, local
+`in`/`rd`, local `match`, and `embcmp`.
+
+Plan:
+
+- [x] Parse embeddings pattern keys in the pattern parser.
+- [x] Call the OpenAI embeddings endpoint lazily from Go.
+- [x] Preserve FIFO ordering by scanning exact-match
+  candidates in identifier order.
+- [x] Keep blocking correct by falling back to polling for
+  embeddings patterns.
 
 ## Indexes
 

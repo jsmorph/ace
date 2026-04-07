@@ -6,8 +6,8 @@ control, TTL, blocking, and limits.
 
 Subcommands that open a database accept `--db` (default:
 `ace.db`) to specify the SQLite file.  Subcommands that do
-not use a database (`match`, `ping`, `version`, `test`,
-`doc`, `help`) ignore `--db`.
+not use a database (`match`, `embcmp`, `ping`, `version`,
+`test`, `doc`, `help`) ignore `--db`.
 
 The `out`, `in`, `rd`, `del`, `stats`, `reg`, `regcheck`,
 `ping`, and `version` subcommands accept `--server` to
@@ -30,6 +30,7 @@ Start the HTTP server.
 | `--scavenge` | `PT1H` | Expiration cleanup interval (ISO 8601) |
 | `--max-waiters` | 0 | Max blocking clients; 0 = unlimited |
 | `--deletes` | false | Enable explicit deletes |
+| `--embeddings-url` | (default endpoint) | Embeddings endpoint URL for embeddings-based matches |
 | `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
 | `--insecure-ids` | false | Allow bare `X-ACE-ID` header without key authentication |
 | `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
@@ -116,11 +117,35 @@ not open a database.
 |------|---------|---------|
 | `--object` | (required) | JSON object |
 | `--pattern` | (required) | JSON pattern |
+| `--embeddings-url` | (default endpoint) | Embeddings endpoint URL |
 
 Output:
 
 ```json
 {"match": true}
+```
+
+## ace embcmp
+
+Compare two strings with the same embeddings client and
+distance metrics used by embeddings-based pattern matching.
+This command does not open a database. The `distance` field
+and `match` decision use the selected metric. The output also
+reports cosine similarity, dot product, and both Euclidean
+distances for the same pair.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--query` | (required) | Query text |
+| `--text` | (required) | Candidate text |
+| `--metric` | `cosine` | Distance metric: `cosine`, `euclidean`, or `sqeuclidean` |
+| `--threshold` | `0.25` | Threshold used to compute the `match` field |
+| `--embeddings-url` | (default endpoint) | Embeddings endpoint URL |
+
+Output:
+
+```json
+{"query":"TexMex food","object":"tacos and queso","metric":"cosine","distance":0.4428172711546092,"cosine_distance":0.4428172711546092,"cosine_similarity":0.5571827288453908,"dot_product":0.8173496184375029,"euclidean_distance":0.9410810769616223,"squared_euclidean_distance":0.8856331227684698,"threshold":0.25,"match":false}
 ```
 
 ## ace del

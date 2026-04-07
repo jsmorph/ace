@@ -124,6 +124,18 @@ In an object, each array element produces its own branch:
 A pattern value matches if any element of the object's array
 satisfies it.
 
+A property name ending in `~` changes that leaf from exact
+matching to embeddings matching. The pattern value must be a
+string. ACE compares that string with the string value at the
+same object path using OpenAI embeddings. `field~` uses
+cosine distance with a default threshold of `0.25`, while
+`field~METRIC<threshold` selects an explicit distance metric
+and threshold. The supported metrics are `cosine`,
+`euclidean`, and `sqeuclidean`. ACE uses
+`EMBEDDINGS_API_KEY` when it is set, otherwise
+`OPENAI_API_KEY`. If neither key is set, the operation
+returns an error.
+
 | Pattern | Object | Match? |
 |---------|--------|--------|
 | `{"a":1}` | `{"a":1}` | yes |

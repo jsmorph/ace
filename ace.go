@@ -24,6 +24,7 @@ type Space struct {
 	db       *sql.DB
 	idgen    *IDGen
 	cfg      Config
+	embedder embeddingProvider
 	notifier *Notifier
 	stop     chan struct{}
 	timerMu  sync.Mutex
@@ -57,10 +58,11 @@ func NewSpace(dbPath string, cfg Config) (*Space, error) {
 	}
 
 	s := &Space{
-		db:    db,
-		idgen: NewIDGen(),
-		cfg:   cfg,
-		stop:  make(chan struct{}),
+		db:       db,
+		idgen:    NewIDGen(),
+		cfg:      cfg,
+		embedder: newOpenAIEmbeddingProvider(cfg.EmbeddingsURL),
+		stop:     make(chan struct{}),
 	}
 
 	if cfg.Blocking == BlockingNotify {
@@ -242,13 +244,13 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 		return nil, validationErr(err)
 	}
 
-	pbs, err := ExtractPatternBranches(pattern)
+	parsed, err := ParsePattern(pattern)
 	if err != nil {
-		return nil, validationErr(fmt.Errorf("extract pattern branches: %w", err))
+		return nil, validationErr(fmt.Errorf("parse pattern: %w", err))
 	}
 
 	queryFn := func() (*Result, error) {
-		return s.executeMatch(pbs, accessType, callerID, since, remove)
+		return s.executeMatch(ctx, parsed, accessType, callerID, since, remove)
 	}
 
 	result, err := queryFn()
@@ -259,15 +261,19 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 		return result, nil
 	}
 
-	if s.notifier != nil {
+	if s.notifier != nil && !parsed.HasEmbeddings() {
 		return s.waitNotify(ctx, pattern, queryFn, time.Now().Add(wait))
 	}
 	return s.poll(ctx, queryFn, time.Now().Add(wait))
 }
 
-func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
+func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
 	defer s.logSlowOp(accessType)()
-	query, args := BuildMatchQuery(pbs, accessType, callerID, since, time.Now())
+	if pattern.HasEmbeddings() {
+		return s.executeEmbeddingMatch(ctx, pattern, accessType, callerID, since, remove)
+	}
+
+	query, args := BuildMatchQuery(pattern.Exact, accessType, callerID, since, time.Now())
 
 	if !remove {
 		var id, jsonStr string
@@ -336,6 +342,144 @@ func (s *Space) executeMatch(pbs []PatternBranch, accessType string, callerID st
 	}
 
 	return result, nil
+}
+
+type matchCandidate struct {
+	ID     string
+	Object json.RawMessage
+}
+
+func (s *Space) executeEmbeddingMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (*Result, error) {
+	candidates, err := s.listMatchCandidates(pattern.Exact, accessType, callerID, since)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, candidate := range candidates {
+		ok, err := matchWithProvider(ctx, candidate.Object, pattern, s.embedder)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			continue
+		}
+
+		if !remove {
+			return &Result{ID: candidate.ID, Object: candidate.Object}, nil
+		}
+
+		result, claimed, err := s.claimCandidate(candidate)
+		if err != nil {
+			return nil, err
+		}
+		if claimed {
+			return result, nil
+		}
+	}
+
+	return nil, nil
+}
+
+func (s *Space) listMatchCandidates(branches []PatternBranch, accessType string, callerID string, since string) ([]matchCandidate, error) {
+	query, args := BuildScanQuery(branches, accessType, callerID, since, time.Now())
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("query candidates: %w", err)
+	}
+	defer rows.Close()
+
+	var candidates []matchCandidate
+	for rows.Next() {
+		var id string
+		var object string
+		if err := rows.Scan(&id, &object); err != nil {
+			return nil, fmt.Errorf("scan candidate: %w", err)
+		}
+		candidates = append(candidates, matchCandidate{
+			ID:     id,
+			Object: json.RawMessage(object),
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate candidates: %w", err)
+	}
+	return candidates, nil
+}
+
+func (s *Space) claimCandidate(candidate matchCandidate) (_ *Result, claimed bool, retErr error) {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, false, fmt.Errorf("begin transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			retErr = errors.Join(retErr, fmt.Errorf("rollback: %w", err))
+		}
+	}()
+
+	now := time.Now().UTC().Format(timestampFormat)
+	result := &Result{
+		ID:     candidate.ID,
+		Object: candidate.Object,
+	}
+
+	if s.cfg.Deletes {
+		did, err := generateDeleteID()
+		if err != nil {
+			return nil, false, fmt.Errorf("generate delete id: %w", err)
+		}
+		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(timestampFormat)
+		res, err := tx.Exec(
+			"UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ? AND expires > ? AND (invisible_until IS NULL OR invisible_until <= ?)",
+			did, invisibleUntil, candidate.ID, now, now,
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("mark invisible: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return nil, false, fmt.Errorf("rows affected: %w", err)
+		}
+		if rows == 0 {
+			return nil, false, nil
+		}
+		result.DeleteID = did
+	} else {
+		res, err := tx.Exec(
+			"DELETE FROM objects WHERE id = ? AND expires > ? AND (invisible_until IS NULL OR invisible_until <= ?)",
+			candidate.ID, now, now,
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("delete object: %w", err)
+		}
+		rows, err := res.RowsAffected()
+		if err != nil {
+			return nil, false, fmt.Errorf("rows affected: %w", err)
+		}
+		if rows == 0 {
+			return nil, false, nil
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, false, fmt.Errorf("commit: %w", err)
+	}
+
+	if s.notifier != nil && result.DeleteID != "" {
+		obj := append(json.RawMessage(nil), candidate.Object...)
+		t := time.AfterFunc(s.cfg.VisibilityTimeout, func() {
+			select {
+			case <-s.stop:
+				return
+			default:
+			}
+			s.notifier.Notify(obj)
+		})
+		s.trackTimer(t)
+	}
+
+	return result, true, nil
 }
 
 func (s *Space) waitNotify(ctx context.Context, pattern json.RawMessage, queryFn func() (*Result, error), deadline time.Time) (*Result, error) {
