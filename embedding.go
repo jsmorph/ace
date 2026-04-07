@@ -233,6 +233,12 @@ type embeddingPredicate struct {
 	Query     string
 }
 
+type questionPredicate struct {
+	Path        []string
+	PathText    string
+	ContextText string
+}
+
 type embeddingMatcher struct {
 	provider embeddingProvider
 	cache    map[string][]float64

@@ -292,7 +292,7 @@ func (srv *Server) handleMatchTest(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	ok, err := matchWithProvider(r.Context(), req.Object, parsed, srv.space.embedder)
+	ok, err := matchWithProviders(r.Context(), req.Object, parsed, srv.space.embedder, srv.space.judge)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

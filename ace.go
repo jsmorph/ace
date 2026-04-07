@@ -25,6 +25,7 @@ type Space struct {
 	idgen    *IDGen
 	cfg      Config
 	embedder embeddingProvider
+	judge    llmJudge
 	notifier *Notifier
 	stop     chan struct{}
 	timerMu  sync.Mutex
@@ -62,6 +63,7 @@ func NewSpace(dbPath string, cfg Config) (*Space, error) {
 		idgen:    NewIDGen(),
 		cfg:      cfg,
 		embedder: newOpenAIEmbeddingProvider(cfg.EmbeddingsURL),
+		judge:    newOpenAILLMJudge(cfg.LLMURL, cfg.LLMModel),
 		stop:     make(chan struct{}),
 	}
 
@@ -261,7 +263,7 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 		return result, nil
 	}
 
-	if s.notifier != nil && !parsed.HasEmbeddings() {
+	if s.notifier != nil && !parsed.HasDynamic() {
 		return s.waitNotify(ctx, pattern, queryFn, time.Now().Add(wait))
 	}
 	return s.poll(ctx, queryFn, time.Now().Add(wait))
@@ -269,8 +271,8 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 
 func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
 	defer s.logSlowOp(accessType)()
-	if pattern.HasEmbeddings() {
-		return s.executeEmbeddingMatch(ctx, pattern, accessType, callerID, since, remove)
+	if pattern.HasDynamic() {
+		return s.executeDynamicMatch(ctx, pattern, accessType, callerID, since, remove)
 	}
 
 	query, args := BuildMatchQuery(pattern.Exact, accessType, callerID, since, time.Now())
@@ -349,14 +351,14 @@ type matchCandidate struct {
 	Object json.RawMessage
 }
 
-func (s *Space) executeEmbeddingMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (*Result, error) {
+func (s *Space) executeDynamicMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (*Result, error) {
 	candidates, err := s.listMatchCandidates(pattern.Exact, accessType, callerID, since)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, candidate := range candidates {
-		ok, err := matchWithProvider(ctx, candidate.Object, pattern, s.embedder)
+		ok, err := matchWithProviders(ctx, candidate.Object, pattern, s.embedder, s.judge)
 		if err != nil {
 			return nil, err
 		}

@@ -16,15 +16,25 @@ type PatternBranch struct {
 type ParsedPattern struct {
 	Exact      []PatternBranch
 	Embeddings []embeddingPredicate
+	Questions  []questionPredicate
 }
 
 func (p ParsedPattern) HasEmbeddings() bool {
 	return len(p.Embeddings) > 0
 }
 
+func (p ParsedPattern) HasQuestions() bool {
+	return len(p.Questions) > 0
+}
+
+func (p ParsedPattern) HasDynamic() bool {
+	return p.HasEmbeddings() || p.HasQuestions()
+}
+
 type patternProperty struct {
 	Name       string
 	Embeddings *embeddingSpec
+	Question   *questionSpec
 }
 
 type embeddingSpec struct {
@@ -32,14 +42,16 @@ type embeddingSpec struct {
 	Threshold float64
 }
 
+type questionSpec struct{}
+
 // ExtractPatternBranches returns the branches for a JSON pattern.
 func ExtractPatternBranches(data []byte) ([]PatternBranch, error) {
 	parsed, err := ParsePattern(data)
 	if err != nil {
 		return nil, err
 	}
-	if parsed.HasEmbeddings() {
-		return nil, fmt.Errorf("pattern uses embeddings matching")
+	if parsed.HasDynamic() {
+		return nil, fmt.Errorf("pattern uses non-exact matching")
 	}
 	return parsed.Exact, nil
 }
@@ -78,6 +90,18 @@ func extractPatternFromObject(obj map[string]interface{}, rawPath, branchPath []
 				Metric:    property.Embeddings.Metric,
 				Threshold: property.Embeddings.Threshold,
 				Query:     query,
+			})
+			continue
+		}
+		if property.Question != nil {
+			contextText, ok := v.(string)
+			if !ok {
+				return fmt.Errorf("LLM pattern at %q requires a string value", strings.Join(raw, "."))
+			}
+			out.Questions = append(out.Questions, questionPredicate{
+				Path:        raw,
+				PathText:    strings.Join(raw, "."),
+				ContextText: contextText,
 			})
 			continue
 		}
@@ -123,6 +147,20 @@ func parsePatternProperty(raw string) (patternProperty, error) {
 			"pattern property %q starts with #; metadata properties are not matchable", raw)
 	}
 
+	if strings.HasSuffix(raw, "?") {
+		name := strings.TrimSuffix(raw, "?")
+		if name == "" {
+			return patternProperty{}, fmt.Errorf("pattern property %q has empty name before ?", raw)
+		}
+		if strings.Contains(name, "~") {
+			return patternProperty{}, fmt.Errorf("pattern property %q mixes ? and ~ suffixes", raw)
+		}
+		return patternProperty{
+			Name:     name,
+			Question: &questionSpec{},
+		}, nil
+	}
+
 	name, suffix, hasSuffix := strings.Cut(raw, "~")
 	if !hasSuffix {
 		return patternProperty{Name: raw}, nil
@@ -130,14 +168,17 @@ func parsePatternProperty(raw string) (patternProperty, error) {
 	if name == "" {
 		return patternProperty{}, fmt.Errorf("pattern property %q has empty name before ~", raw)
 	}
+	if strings.Contains(name, "?") {
+		return patternProperty{}, fmt.Errorf("pattern property %q mixes ? and ~ suffixes", raw)
+	}
 	if suffix == "" {
 		return patternProperty{
-				Name: name,
-				Embeddings: &embeddingSpec{
-					Metric:    embeddingMetricCosine,
-					Threshold: DefaultEmbeddingThreshold,
-				},
-			}, nil
+			Name: name,
+			Embeddings: &embeddingSpec{
+				Metric:    embeddingMetricCosine,
+				Threshold: DefaultEmbeddingThreshold,
+			},
+		}, nil
 	}
 
 	metricText, thresholdText, ok := strings.Cut(suffix, "<")

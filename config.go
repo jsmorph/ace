@@ -23,6 +23,8 @@ type Config struct {
 	InsecureIDs                 bool          `json:"insecure_ids"`
 	IdentityTTL                 time.Duration `json:"identity_ttl"`
 	EmbeddingsURL               string        `json:"embeddings_url"`
+	LLMURL                      string        `json:"llm_url"`
+	LLMModel                    string        `json:"llm_model"`
 }
 
 // DefaultConfig returns a Config with sensible defaults.
@@ -35,5 +37,7 @@ func DefaultConfig() Config {
 		DBOperationTimeMonitorLimit: time.Second,
 		IdentityTTL:                 40 * 24 * time.Hour,
 		EmbeddingsURL:               defaultEmbeddingsURL,
+		LLMURL:                      defaultLLMURL,
+		LLMModel:                    defaultLLMModel,
 	}
 }

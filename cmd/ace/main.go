@@ -112,6 +112,8 @@ func cmdServe(args []string) {
 	deletes := fs.Bool("deletes", false, "enable explicit deletes (visibility timeout)")
 	visTimeout := fs.String("visibility-timeout", "PT30S", "visibility timeout (ISO 8601 duration)")
 	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
+	llmURL := fs.String("llm-url", "", "LLM endpoint URL")
+	llmModel := fs.String("llm-model", "", "LLM model")
 	insecureIDs := fs.Bool("insecure-ids", false, "allow bare X-ACE-ID header (no key required)")
 	identityTTLStr := fs.String("identity-ttl", "P40D", "identity expiration (ISO 8601 duration)")
 	tlsHost := fs.String("tls", "", "hostname for automatic TLS via Let's Encrypt")
@@ -146,6 +148,12 @@ func cmdServe(args []string) {
 	cfg.InsecureIDs = *insecureIDs
 	if *embeddingsURL != "" {
 		cfg.EmbeddingsURL = *embeddingsURL
+	}
+	if *llmURL != "" {
+		cfg.LLMURL = *llmURL
+	}
+	if *llmModel != "" {
+		cfg.LLMModel = *llmModel
 	}
 
 	identityTTL, err := ace.ParseISO8601Duration(*identityTTLStr)
@@ -628,6 +636,8 @@ func cmdMatch(args []string, remove bool) {
 	waitStr := fs.String("wait", "", "block duration (integer seconds, ISO 8601, or Go duration)")
 	deletes := fs.Bool("deletes", false, "enable explicit deletes")
 	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
+	llmURL := fs.String("llm-url", "", "LLM endpoint URL")
+	llmModel := fs.String("llm-model", "", "LLM model")
 	fs.Parse(args)
 
 	var wait time.Duration
@@ -661,6 +671,12 @@ func cmdMatch(args []string, remove bool) {
 		if *embeddingsURL != "" {
 			log.Printf("warning: --embeddings-url is ignored in remote mode; the server's configuration controls the embeddings endpoint")
 		}
+		if *llmURL != "" {
+			log.Printf("warning: --llm-url is ignored in remote mode; the server's configuration controls the LLM endpoint")
+		}
+		if *llmModel != "" {
+			log.Printf("warning: --llm-model is ignored in remote mode; the server's configuration controls the LLM model")
+		}
 		remoteMatch(url, pat, *callerID, resolveClientKey(*key), wait, *since, remove)
 		return
 	}
@@ -671,6 +687,12 @@ func cmdMatch(args []string, remove bool) {
 	}
 	if *embeddingsURL != "" {
 		cfg.EmbeddingsURL = *embeddingsURL
+	}
+	if *llmURL != "" {
+		cfg.LLMURL = *llmURL
+	}
+	if *llmModel != "" {
+		cfg.LLMModel = *llmModel
 	}
 
 	space, err := ace.NewSpace(*dbPath, cfg)
@@ -787,6 +809,8 @@ func cmdMatchTest(args []string) {
 	object := fs.String("object", "", "JSON object")
 	pattern := fs.String("pattern", "", "JSON pattern")
 	embeddingsURL := fs.String("embeddings-url", "", "embeddings endpoint URL")
+	llmURL := fs.String("llm-url", "", "LLM endpoint URL")
+	llmModel := fs.String("llm-model", "", "LLM model")
 	fs.Parse(args)
 
 	if *object == "" {
@@ -796,7 +820,18 @@ func cmdMatchTest(args []string) {
 		log.Fatal("--pattern is required")
 	}
 
-	ok, err := ace.MatchWithEmbeddingsURL(json.RawMessage(*object), json.RawMessage(*pattern), *embeddingsURL)
+	cfg := ace.DefaultConfig()
+	if *embeddingsURL != "" {
+		cfg.EmbeddingsURL = *embeddingsURL
+	}
+	if *llmURL != "" {
+		cfg.LLMURL = *llmURL
+	}
+	if *llmModel != "" {
+		cfg.LLMModel = *llmModel
+	}
+
+	ok, err := ace.MatchWithConfig(json.RawMessage(*object), json.RawMessage(*pattern), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -219,12 +219,12 @@ func TestMatchWithEmbeddings(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ok, err := matchWithProvider(context.Background(), json.RawMessage(`{"type":"task","context":"tacos and queso"}`), parsed, stubEmbeddingProvider{
+	ok, err := matchWithProviders(context.Background(), json.RawMessage(`{"type":"task","context":"tacos and queso"}`), parsed, stubEmbeddingProvider{
 		values: map[string][]float64{
 			"TexMex food":     {0, 1},
 			"tacos and queso": {0, 1},
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

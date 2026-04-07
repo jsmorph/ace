@@ -136,6 +136,15 @@ and threshold. The supported metrics are `cosine`,
 `OPENAI_API_KEY`. If neither key is set, the operation
 returns an error.
 
+A property name ending in `?` changes that leaf from exact
+matching to LLM-based relation matching. The pattern value
+must be a string. ACE sends the candidate text and the
+pattern text to an LLM with a fixed prompt that asks whether
+`TEXT` is related to `CTEXT`, requiring the model to answer
+`yes` or `no` and nothing else. ACE uses `LLM_API_KEY` when
+it is set, otherwise `OPENAI_API_KEY`. If neither key is
+set, the operation returns an error.
+
 | Pattern | Object | Match? |
 |---------|--------|--------|
 | `{"a":1}` | `{"a":1}` | yes |

@@ -31,6 +31,8 @@ Start the HTTP server.
 | `--max-waiters` | 0 | Max blocking clients; 0 = unlimited |
 | `--deletes` | false | Enable explicit deletes |
 | `--embeddings-url` | (default endpoint) | Embeddings endpoint URL for embeddings-based matches |
+| `--llm-url` | (default endpoint) | LLM endpoint URL for `?` predicates |
+| `--llm-model` | `gpt-5-mini` | LLM model for `?` predicates |
 | `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
 | `--insecure-ids` | false | Allow bare `X-ACE-ID` header without key authentication |
 | `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
@@ -95,6 +97,9 @@ Find and remove the earliest matching object.
 | `--key` | `$ACE_CLIENT_KEY` | Client key for authentication |
 | `--wait` | (none) | Block duration (integer seconds, ISO 8601, or Go duration) |
 | `--deletes` | false | Enable explicit deletes |
+| `--embeddings-url` | (default endpoint) | Embeddings endpoint URL for `~` predicates |
+| `--llm-url` | (default endpoint) | LLM endpoint URL for `?` predicates |
+| `--llm-model` | `gpt-5-mini` | LLM model for `?` predicates |
 
 If `--pattern` is absent or `-`, the command reads the
 pattern from stdin. Output is a JSON result or `null` if no
@@ -118,6 +123,8 @@ not open a database.
 | `--object` | (required) | JSON object |
 | `--pattern` | (required) | JSON pattern |
 | `--embeddings-url` | (default endpoint) | Embeddings endpoint URL |
+| `--llm-url` | (default endpoint) | LLM endpoint URL |
+| `--llm-model` | `gpt-5-mini` | LLM model |
 
 Output:
 

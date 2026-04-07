@@ -75,14 +75,17 @@ Request body:
 | `wait` | no | Maximum time to block: a JSON number (seconds), an integer string, an ISO 8601 duration string (e.g. `"PT10S"`), or a Go duration string (e.g. `"10s"`). Default: 0. |
 | `since` | no | Only objects after this identifier |
 
-The `pattern` field accepts the embeddings syntax described
-in `spec.md`. `{"context~":"TexMex food"}` uses the default
-cosine-distance threshold, and
+The `pattern` field accepts the embeddings and LLM syntax
+described in `spec.md`. `{"context~":"TexMex food"}` uses the
+default cosine-distance threshold, and
 `{"context~euclidean<1e-3":"TexMex food"}` selects an
-explicit metric and threshold. The server uses
-`EMBEDDINGS_API_KEY` when it is set, otherwise
-`OPENAI_API_KEY`. If neither key is set, the server returns a
-400 error explaining that embeddings filtering is
+explicit embeddings metric and threshold. `{"comment?":"TexMex food"}`
+uses the server's configured LLM endpoint and model with the
+built-in yes-or-no relation prompt. The server uses
+`EMBEDDINGS_API_KEY` for embeddings and `LLM_API_KEY` for LLM
+matching when those keys are set, otherwise `OPENAI_API_KEY`.
+If the required key is unavailable, the server returns a 400
+error explaining that the requested filtering mode is
 unavailable.
 
 Response when a match exists (200):

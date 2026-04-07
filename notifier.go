@@ -115,7 +115,10 @@ func convertToQuamina(obj map[string]interface{}) (map[string]interface{}, error
 			return nil, err
 		}
 		if property.Embeddings != nil {
-			return nil, fmt.Errorf("pattern uses embeddings matching; notifier does not support it")
+			return nil, fmt.Errorf("pattern uses dynamic matching; notifier does not support it")
+		}
+		if property.Question != nil {
+			return nil, fmt.Errorf("pattern uses dynamic matching; notifier does not support it")
 		}
 		switch val := v.(type) {
 		case map[string]interface{}:

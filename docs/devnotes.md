@@ -64,13 +64,13 @@ control adds a clause that checks either no access
 restriction exists for the operation type, or the caller's ID
 appears in the access list.
 
-Embeddings predicates follow a different path. A key ending
-in `~` or `~METRIC<threshold` does not generate SQL branches.
-Instead, ACE uses the exact branches in the pattern to narrow
-the candidate set, then evaluates the embeddings predicates
-in Go against each candidate object in identifier order. This
-preserves FIFO behavior for `rd` and `in` without storing
-embeddings in SQLite.
+Dynamic predicates follow a different path. A key ending in
+`~`, `~METRIC<threshold`, or `?` does not generate SQL
+branches. Instead, ACE uses the exact branches in the
+pattern to narrow the candidate set, then evaluates the
+dynamic predicates in Go against each candidate object in
+identifier order. This preserves FIFO behavior for `rd` and
+`in` without storing embeddings or LLM decisions in SQLite.
 
 ## Blocking
 
@@ -104,11 +104,11 @@ Ace patterns convert to Quamina format by wrapping atomic
 leaves in arrays: `{"a":1}` becomes `{"a":[1]}`. Array
 leaves are already in Quamina format.
 
-Embeddings predicates do not compile into Quamina. The
+Dynamic predicates do not compile into Quamina. The
 notification path would otherwise need to call a remote API
 for every `out`, which would tie commit latency to network
 latency and serialize the entire space behind the single
-SQLite connection. When a pattern contains embeddings
+SQLite connection. When a pattern contains embeddings or LLM
 predicates, blocking reads fall back to polling.
 
 ## Embeddings Matching
@@ -135,6 +135,28 @@ model when a deployment needs a different embeddings model.
 exposes it through `--embeddings-url` on `serve`, local
 `in`/`rd`, local `match`, and `embcmp`.
 
+## LLM Matching
+
+ACE parses `field?` as an LLM predicate. The pattern value
+must be a string. The object value at the same path may be a
+string or an array of strings, and any element that yields a
+`yes` answer satisfies the predicate.
+
+The current implementation uses `POST /v1/chat/completions`
+with a system message that requires `yes` or `no`, plus a
+user prompt that includes both `TEXT` and `CTEXT`, following
+the
+[OpenAI Chat Completions reference](https://platform.openai.com/docs/api-reference/chat/create-chat-completion).
+The default model is `gpt-5-mini`, based on the current
+[OpenAI models list](https://developers.openai.com/api/docs/models/all/).
+ACE uses `LLM_API_KEY` when it is set, otherwise
+`OPENAI_API_KEY`. If neither key is set, ACE returns a
+validation error that states that LLM filtering is
+unavailable. `Config.LLMURL` and `Config.LLMModel` control
+the endpoint and model, and the CLI exposes them through
+`--llm-url` and `--llm-model` on `serve`, local `in`/`rd`,
+and local `match`.
+
 Plan:
 
 - [x] Parse embeddings pattern keys in the pattern parser.
@@ -143,6 +165,13 @@ Plan:
   candidates in identifier order.
 - [x] Keep blocking correct by falling back to polling for
   embeddings patterns.
+- [x] Parse `?` pattern keys in the pattern parser.
+- [x] Call the LLM endpoint lazily from Go with configurable
+  endpoint URL and model.
+- [x] Reuse the dynamic candidate-scan path so `?` predicates
+  preserve FIFO ordering.
+- [x] Keep blocking correct by falling back to polling for
+  `?` predicates.
 
 ## Indexes
 

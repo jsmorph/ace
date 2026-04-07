@@ -102,6 +102,29 @@ the server's embeddings client. Local CLI commands that can
 evaluate embeddings patterns, including `ace in`, `ace rd`,
 `ace match`, and `ace embcmp`, accept the same flag.
 
+A property name ending in `?` enables LLM-based relation
+matching for that leaf. The pattern value must be a string.
+ACE sends the candidate text and the pattern text to an LLM
+with a fixed prompt that asks whether `TEXT` is related to
+`CTEXT`, requiring the model to answer `yes` or `no` and
+nothing else. ACE uses `LLM_API_KEY` when it is set,
+otherwise `OPENAI_API_KEY`. If neither key is set, ACE
+returns an error instead of attempting LLM matching.
+
+The default LLM client uses OpenAI's chat-completions
+endpoint with model `gpt-5-mini`, but ACE can point to any
+compatible endpoint and model. `ace serve` accepts
+`--llm-url` and `--llm-model` to configure the server's LLM
+client. Local CLI commands that can evaluate `?` predicates,
+including `ace in`, `ace rd`, and `ace match`, accept the
+same flags.
+
+Like embeddings predicates, `?` predicates use exact SQL
+branches to narrow candidates first, then evaluate the LLM
+predicate in object ID order. Blocking reads with `?`
+predicates fall back to polling instead of Quamina
+notifications.
+
 | Pattern | Object | Match? |
 |---------|--------|--------|
 | `{"a":1}` | `{"a":1}` | yes |
@@ -148,6 +171,14 @@ ace serve --addr localhost:8000 \
   --embeddings-url https://example.com/v1/embeddings
 ```
 
+Start a server with an explicit LLM endpoint and model:
+
+```
+ace serve --addr localhost:8000 \
+  --llm-url https://example.com/v1/chat/completions \
+  --llm-model gpt-5-mini
+```
+
 Write an object:
 
 ```
@@ -173,6 +204,13 @@ Read with embeddings matching:
 ```
 curl -X POST http://localhost:8000/rd \
   -d '{"pattern":{"type":"task","context~":"TexMex food"}}'
+```
+
+Read with LLM relation matching:
+
+```
+curl -X POST http://localhost:8000/rd \
+  -d '{"pattern":{"type":"task","comment?":"TexMex food"}}'
 ```
 
 Read and remove:
@@ -208,6 +246,12 @@ server:
 ```
 ace match --object '{"type":"task","priority":1}' \
   --pattern '{"type":"task"}'
+
+ace match \
+  --object '{"type":"task","comment":"tacos and queso"}' \
+  --pattern '{"type":"task","comment?":"TexMex food"}' \
+  --llm-url https://example.com/v1/chat/completions \
+  --llm-model gpt-5-mini
 ```
 
 `ace embcmp` compares two texts with the same embeddings
