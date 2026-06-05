@@ -23,6 +23,12 @@ HTTP use, and `ace-mcp` covers remote MCP over Streamable
 HTTP. `ace help` prints the CLI skill because the command
 line is the context in which help is requested.
 
+Each skill directory also has a short `summary.md`. The
+summary describes when an agent should read that skill and
+links to the local `SKILL.md`. The summaries are embedded in
+`ace doc` with the skills so agents can discover them through
+the binary.
+
 The direct HTTP specification excludes MCP. Remote MCP remains
 documented in `docs/mcp-spec.md` and
 `skills/ace-mcp/SKILL.md`, where examples use complete

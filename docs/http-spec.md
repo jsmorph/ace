@@ -271,8 +271,11 @@ ACE is a coordination service for software agents based on the tuple-space model
   /doc/docs/cli-spec.md
   /doc/docs/mcp-spec.md
   /doc/docs/guide.md
+  /doc/skills/ace-cli/summary.md
   /doc/skills/ace-cli/SKILL.md
+  /doc/skills/ace-netapi/summary.md
   /doc/skills/ace-netapi/SKILL.md
+  /doc/skills/ace-mcp/summary.md
   /doc/skills/ace-mcp/SKILL.md
 ```
 

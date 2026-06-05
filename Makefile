@@ -10,7 +10,7 @@ fmt:
 
 build: ace
 
-ace: $(wildcard *.go) $(wildcard cmd/ace/*.go) $(wildcard core/*.go) $(wildcard cli/*.go) $(wildcard netapi/*.go) $(wildcard mcp/*.go) $(wildcard docs/*.md) $(wildcard skills/*/SKILL.md)
+ace: $(wildcard *.go) $(wildcard cmd/ace/*.go) $(wildcard core/*.go) $(wildcard cli/*.go) $(wildcard netapi/*.go) $(wildcard mcp/*.go) $(wildcard docs/*.md) $(wildcard skills/*/*.md)
 	go build -ldflags '$(LDFLAGS)' -o ace ./cmd/ace
 
 test:
