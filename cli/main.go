@@ -82,7 +82,7 @@ func usage() {
 }
 
 func cmdHelp() {
-	data, err := acedocs.Docs.ReadFile("docs/skill.md")
+	data, err := acedocs.Docs.ReadFile("skills/ace-cli/SKILL.md")
 	if err != nil {
 		log.Fatal(err)
 	}

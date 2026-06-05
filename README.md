@@ -36,8 +36,8 @@ some of these patterns, but they require the sender to choose
 a destination queue or topic. A tuple space lets agents
 coordinate through the content of the data: write a JSON
 object describing a task, and any agent whose pattern matches
-it can retrieve it. No routing configuration, no queue names,
-no broker topics.
+it can retrieve it. The writer does not choose a route,
+queue, topic, or recipient.
 
 ACE adapts Gelernter's model for this setting, replacing
 tuples with JSON objects and adding access control, TTL, and
@@ -378,11 +378,13 @@ up to execute their queries.
 | [Specification](docs/spec.md) | Operations, matching, access, TTL, limits |
 | [HTTP API](docs/http-spec.md) | Endpoints, request/response formats |
 | [CLI reference](docs/cli-spec.md) | Subcommands, flags, stdin behavior |
-| [MCP interface](docs/mcp-spec.md) | MCP tools, arguments, and stdio behavior |
+| [MCP interface](docs/mcp-spec.md) | MCP tools, arguments, stdio, and remote HTTP behavior |
 | [Usage guide](docs/guide.md) | Worked examples for three scenarios |
 | [Related systems](docs/related.md) | Real-world analogs to the tuple-space model |
 | [Pattern extensions](docs/extensions.md) | Numeric and string inequality matching via Quamina fork |
-| [Overview](docs/skill.md) | Summary for agents and `ace help` output |
+| [ACE CLI skill](skills/ace-cli/SKILL.md) | Agent-facing CLI usage |
+| [ACE HTTP API skill](skills/ace-netapi/SKILL.md) | Agent-facing HTTP API usage |
+| [ACE remote MCP skill](skills/ace-mcp/SKILL.md) | Agent-facing remote MCP usage |
 
 ## Dependencies
 

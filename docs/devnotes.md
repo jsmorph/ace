@@ -16,13 +16,27 @@ can share tests and middleware without depending on command
 startup code. The MCP server lives in `mcp` and calls the
 same `core.Space` methods as the other interfaces.
 
+The agent-facing skill material lives under `skills/` rather
+than `docs/`. Each skill is interface-specific and standalone:
+`ace-cli` covers command-line use, `ace-netapi` covers direct
+HTTP use, and `ace-mcp` covers remote MCP over Streamable
+HTTP. `ace help` prints the CLI skill because the command
+line is the context in which help is requested.
+
+The direct HTTP specification excludes MCP. Remote MCP remains
+documented in `docs/mcp-spec.md` and
+`skills/ace-mcp/SKILL.md`, where examples use complete
+JSON-RPC request bodies for Streamable HTTP. The obsolete
+original specification was removed because it described
+pre-split interfaces and old access-control terms.
+
 ## MCP Interface
 
 MCP implementation follows the official Model Context
 Protocol revision `2025-06-18`. The transport rules come from
 [MCP transports](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports),
 which define stdio as newline-delimited JSON-RPC on stdin and
-stdout. The tool shape comes from
+stdout. The tool API comes from
 [MCP tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools),
 which defines `tools/list`, `tools/call`, tool metadata, and
 tool result error handling.
@@ -36,8 +50,8 @@ client can inspect the failure text, while malformed
 JSON-RPC requests and unknown tools return protocol errors.
 
 Remote MCP uses Streamable HTTP at `/mcp`. The implementation
-currently returns direct `application/json` responses for
-requests and 202 for notifications or client responses.
+returns direct `application/json` responses for requests and
+202 for notifications or client responses.
 `GET /mcp` returns 405 because ACE does not send unsolicited
 server-to-client messages. The endpoint can require bearer
 auth through `--mcp-token` or `ACE_MCP_TOKEN`, and it can
@@ -260,7 +274,7 @@ WARN high latency 1.234s for out
 ```
 
 A limit of 0 disables monitoring. High latency is
-informational, not an error. The `logSlowOp` method captures
+informational. The `logSlowOp` method captures
 `time.Now()` on entry and checks elapsed time on return via
 `defer`.
 
@@ -277,7 +291,7 @@ They are stored in the object JSON and returned to callers
 but excluded from all matching. The filter is applied in
 three places: `extractFromObject` (branch.go),
 `extractPatternFromObject` (pattern.go), and
-`convertToQuamina` (notifier.go). Each skips `#`-prefixed
+`convertToQuamina` (`core/notifier.go`). Each skips `#`-prefixed
 keys at every recursion level.
 
 `#` properties in patterns are rejected as errors because
@@ -356,7 +370,7 @@ When `Config.InsecureIDs` is false (the default), access list
 entries must carry an `ace:` or `acen:` prefix, and the
 `X-ACE-ID` header is rejected. When true, bare strings are
 accepted in both contexts for backward compatibility with
-existing tests and development workflows.
+existing tests and development use.
 
 ### LookupKey atomicity
 
@@ -390,7 +404,7 @@ challenge responses and HTTPS redirects (via `m.HTTPHandler`).
 Both ports are required by the ACME protocol, so `--addr` is
 ignored when `--tls` is set.
 
-Certificates are cached on disk in the `--tls-cache` directory
+Certificates are stored on disk in the `--tls-cache` directory
 (default `certs`), using `autocert.DirCache`.  The manager
 handles renewal automatically before expiration.
 
@@ -411,7 +425,7 @@ by a `sync.Mutex`.
 
 ## Automatic Updates
 
-The `Updater` (in `updater.go`) polls a source for new
+The `Updater` in `cli/updater.go` polls a source for new
 binaries.  Two source types:
 
 **URL**: HTTP HEAD to `URL/latest/download/ace-GOOS-GOARCH`
@@ -424,7 +438,7 @@ the file's modtime.
 
 Both skip the first check to establish a baseline (the
 assumption is that the running binary matches what the source
-currently offers).
+offers).
 
 The ETag/Last-Modified state is updated only after a
 successful download, so a failed download retries on the next
@@ -460,8 +474,8 @@ each attempt.  The port is free after `Shutdown` closes the
 listener (step 1), so the retry window covers the startup
 delay of the new process.
 
-The `drainer` middleware wraps the handler with an
-`atomic.Bool`.  When draining, new requests receive 503
+The `drainer` middleware checks an `atomic.Bool` before
+calling the handler.  When draining, new requests receive 503
 with a `Retry-After: 30` header.  The drainer is only
 installed when `--updates` is set.
 

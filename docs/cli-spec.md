@@ -40,7 +40,7 @@ Start the HTTP server.
 | `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
 | `--throttle` | 60 | Max requests per minute per IP (0 = unlimited) |
 | `--tls` | (none) | Hostname for automatic TLS via Let's Encrypt |
-| `--tls-cache` | `certs` | Directory for cached TLS certificates |
+| `--tls-cache` | `certs` | Directory for stored TLS certificates |
 | `--updates` | (none) | Update source: GitHub releases URL or local directory |
 | `--update-interval` | `PT1H` | Update check interval (ISO 8601) |
 | `--mcp-token` | `$ACE_MCP_TOKEN` | Bearer token required for `/mcp` when non-empty |
@@ -54,7 +54,7 @@ The server also exposes remote MCP at `/mcp` using the
 Streamable HTTP transport. `POST /mcp` accepts one MCP
 JSON-RPC message and returns a JSON-RPC response or 202 for
 notifications and client responses. `GET /mcp` returns 405
-because ACE does not currently send unsolicited MCP messages.
+because ACE does not send unsolicited MCP messages.
 Set `--mcp-token` or `ACE_MCP_TOKEN` to require bearer-token
 authentication. Set `--mcp-origins` to reject browser
 requests whose `Origin` header is not in the configured list.
@@ -62,7 +62,7 @@ requests whose `Origin` header is not in the configured list.
 When `--tls` is set, the server listens on port 443 for HTTPS
 and port 80 for ACME challenges and HTTP-to-HTTPS redirects.
 The `--addr` flag is ignored in this mode.  Certificates are
-obtained automatically from Let's Encrypt and cached in the
+obtained automatically from Let's Encrypt and stored in the
 `--tls-cache` directory.
 
 When `--updates` is set, the server polls for a new binary at
@@ -289,9 +289,8 @@ deleted 0 expired identities
 
 ## ace help
 
-Print a summary of ACE's functionality, operations, and how
-to access the full documentation. The output is the contents
-of `skill.md`.
+Print an agent-facing guide for using ACE through the CLI.
+The output is the contents of `skills/ace-cli/SKILL.md`.
 
 ## ace doc
 

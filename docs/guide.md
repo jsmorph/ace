@@ -2,15 +2,14 @@
 
 These examples show how agents coordinate through ACE in
 three settings: local software development, research, and a
-shared business workflow with access control. All examples
+shared business process with access control. All examples
 use the CLI. The HTTP API accepts the same objects and
 patterns.
 
-Object values are limited to 128 bytes by default. ACE is a
-coordination service, not a content store: objects carry
-enough structure for pattern matching, and agents that need
-to exchange large payloads can store them elsewhere and
-reference them by URL.
+Object values are limited to 128 bytes by default. ACE
+stores coordination records: objects carry enough structure
+for pattern matching, and agents that need to exchange large
+payloads can store them elsewhere and reference them by URL.
 
 ## Software development
 
@@ -138,7 +137,7 @@ Because sources were posted with `--ttl P1D`, they expire
 after one day. The coordinator can also run `ace expire` to
 clean up immediately.
 
-## Business workflow with access control
+## Business Process With Access Control
 
 An intake agent posts customer requests. Only authorized
 processing agents can claim them. A compliance agent can read

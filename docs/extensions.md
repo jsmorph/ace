@@ -57,13 +57,13 @@ comparisons.
 
 ## Integration with ACE
 
-To use these extensions in ACE, two things would need to
-happen. First, the notification path (notifier.go) would need
-to call `UseStdExtension()` and use `AddExtendedPattern()`
-when registering patterns with Quamina. Second, the SQL query
-path (query.go) would need equivalent WHERE clauses: numeric
-comparisons map to SQL `<`, `>`, etc., and string comparisons
-map to the same operators on TEXT columns.
+ACE integration requires two changes. First, the notification
+path in `core/notifier.go` would call `UseStdExtension()` and
+use `AddExtendedPattern()` when registering patterns with
+Quamina. Second, the SQL match-query builder would need
+equivalent WHERE clauses: numeric comparisons map to SQL
+`<`, `>`, etc., and string comparisons map to the same
+operators on TEXT columns.
 
 The extension predicate mechanism handles the Quamina side.
 The SQL side requires translating extension constraints into

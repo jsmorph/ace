@@ -52,7 +52,7 @@ Each client message is a new HTTP `POST` request containing a
 single MCP JSON-RPC message. Requests receive a JSON-RPC
 response with `Content-Type: application/json`. Notifications
 and client responses receive `202 Accepted` with no body.
-`GET /mcp` returns 405 because ACE does not currently send
+`GET /mcp` returns 405 because ACE does not send
 unsolicited server-to-client messages.
 
 Recommended request headers:

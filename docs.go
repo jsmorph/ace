@@ -5,7 +5,7 @@ import "embed"
 // Commit is the git commit hash, set at build time via ldflags.
 var Commit string
 
-//go:embed README.md docs/spec.md docs/http-spec.md docs/cli-spec.md docs/mcp-spec.md docs/guide.md docs/skill.md
+//go:embed README.md docs/spec.md docs/http-spec.md docs/cli-spec.md docs/mcp-spec.md docs/guide.md skills/ace-cli/SKILL.md skills/ace-netapi/SKILL.md skills/ace-mcp/SKILL.md
 var Docs embed.FS
 
 var DocFiles = []string{
@@ -15,5 +15,7 @@ var DocFiles = []string{
 	"docs/cli-spec.md",
 	"docs/mcp-spec.md",
 	"docs/guide.md",
-	"docs/skill.md",
+	"skills/ace-cli/SKILL.md",
+	"skills/ace-netapi/SKILL.md",
+	"skills/ace-mcp/SKILL.md",
 }
