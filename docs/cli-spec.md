@@ -7,7 +7,9 @@ control, TTL, blocking, and limits.
 Subcommands that open a database accept `--db` (default:
 `ace.db`) to specify the SQLite file.  Subcommands that do
 not use a database (`match`, `embcmp`, `ping`, `version`,
-`test`, `doc`, `help`) ignore `--db`.
+`test`, `doc`, `help`) ignore `--db`.  The `serve` command
+opens the HTTP interface, and the `mcp` command opens the
+MCP stdio interface.
 
 The `out`, `in`, `rd`, `del`, `stats`, `reg`, `regcheck`,
 `ping`, and `version` subcommands accept `--server` to
@@ -41,10 +43,21 @@ Start the HTTP server.
 | `--tls-cache` | `certs` | Directory for cached TLS certificates |
 | `--updates` | (none) | Update source: GitHub releases URL or local directory |
 | `--update-interval` | `PT1H` | Update check interval (ISO 8601) |
+| `--mcp-token` | `$ACE_MCP_TOKEN` | Bearer token required for `/mcp` when non-empty |
+| `--mcp-origins` | (none) | Comma-separated allowed `Origin` values for `/mcp` |
 
 The server deletes expired objects at each scavenge interval
 and purges expired identities with 1-in-10 probability per
 tick.
+
+The server also exposes remote MCP at `/mcp` using the
+Streamable HTTP transport. `POST /mcp` accepts one MCP
+JSON-RPC message and returns a JSON-RPC response or 202 for
+notifications and client responses. `GET /mcp` returns 405
+because ACE does not currently send unsolicited MCP messages.
+Set `--mcp-token` or `ACE_MCP_TOKEN` to require bearer-token
+authentication. Set `--mcp-origins` to reject browser
+requests whose `Origin` header is not in the configured list.
 
 When `--tls` is set, the server listens on port 443 for HTTPS
 and port 80 for ACME challenges and HTTP-to-HTTPS redirects.
@@ -63,6 +76,28 @@ in-flight requests to complete, closes the database, starts
 the new binary with the same arguments, and exits.  The new
 process retries its listen call for up to 30 seconds while
 the old process finishes.
+
+## ace mcp
+
+Start the MCP stdio server. The command reads MCP JSON-RPC
+messages from stdin and writes MCP JSON-RPC messages to
+stdout. Logs and fatal errors are written to stderr.
+
+| Flag | Default | Purpose |
+|------|---------|---------|
+| `--db` | `ace.db` | Database file |
+| `--limits` | (none) | JSON file overriding default limits |
+| `--blocking` | `polling` | `polling` or `notify` |
+| `--deletes` | false | Enable explicit deletes |
+| `--visibility-timeout` | `PT30S` | Visibility timeout (ISO 8601) |
+| `--embeddings-url` | (default endpoint) | Embeddings endpoint URL for `~` predicates |
+| `--llm-url` | (default endpoint) | LLM endpoint URL for `?` predicates |
+| `--llm-model` | `gpt-5-mini` | LLM model for `?` predicates |
+| `--insecure-ids` | false | Accepted for configuration parity with other interfaces |
+| `--identity-ttl` | `P40D` | Identity expiration (ISO 8601) |
+
+See `mcp-spec.md` for tool names, arguments, and result
+formats.
 
 ## ace out
 

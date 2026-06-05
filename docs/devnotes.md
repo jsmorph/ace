@@ -2,10 +2,57 @@
 
 ## Architecture
 
-The `ace` package is both a library and a CLI. The library
-(`package ace`) exposes `Space` as the main type with `Out`,
-`In`, and `Rd` methods. The CLI (`cmd/ace/main.go`) is a
-thin wrapper that dispatches subcommands.
+The repository separates core behavior from external
+interfaces. The `core` package owns `Space`, persistence,
+matching, identity registration, limits, and provider-backed
+dynamic predicates. The `cli`, `netapi`, and `mcp` packages
+adapt that core API for command-line use, HTTP, and MCP
+stdio, while the root package keeps embedded documentation
+and build metadata.
+
+The command binary at `cmd/ace` is a small entry point that
+delegates to `cli.Main`. The HTTP API lives in `netapi` so it
+can share tests and middleware without depending on command
+startup code. The MCP server lives in `mcp` and calls the
+same `core.Space` methods as the other interfaces.
+
+## MCP Interface
+
+MCP implementation follows the official Model Context
+Protocol revision `2025-06-18`. The transport rules come from
+[MCP transports](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports),
+which define stdio as newline-delimited JSON-RPC on stdin and
+stdout. The tool shape comes from
+[MCP tools](https://modelcontextprotocol.io/specification/2025-06-18/server/tools),
+which defines `tools/list`, `tools/call`, tool metadata, and
+tool result error handling.
+
+The server implements `initialize`, `notifications/initialized`,
+`ping`, `tools/list`, and `tools/call`. Tool results use
+`content` plus `structuredContent`, matching the
+[MCP schema reference](https://modelcontextprotocol.io/specification/2025-06-18/schema).
+ACE operation errors return `isError: true` tool results so a
+client can inspect the failure text, while malformed
+JSON-RPC requests and unknown tools return protocol errors.
+
+Remote MCP uses Streamable HTTP at `/mcp`. The implementation
+currently returns direct `application/json` responses for
+requests and 202 for notifications or client responses.
+`GET /mcp` returns 405 because ACE does not send unsolicited
+server-to-client messages. The endpoint can require bearer
+auth through `--mcp-token` or `ACE_MCP_TOKEN`, and it can
+restrict browser `Origin` headers through `--mcp-origins`.
+
+Plan:
+
+- [x] Split existing code into `core`, `cli`, and `netapi`.
+- [x] Keep the root package for embedded docs and `Commit`.
+- [x] Add `mcp` with stdio JSON-RPC framing.
+- [x] Expose ACE operations as MCP tools.
+- [x] Add tests for initialization, tool listing, and tool
+  calls.
+- [x] Add Streamable HTTP transport at `/mcp`.
+- [x] Add bearer-token and Origin checks for remote MCP.
 
 ## SQLite
 
@@ -387,7 +434,7 @@ one.  GitHub releases URLs redirect to a CDN; the standard
 HTTP client follows redirects, so the ETag and Last-Modified
 come from the CDN.
 
-The update sequence in `main.go`:
+The update sequence in `cli/main.go`:
 
 1. The `onUpdate` callback (running in the updater goroutine)
    sets the `drainer` flag so new requests get 503, then

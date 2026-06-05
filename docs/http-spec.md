@@ -18,6 +18,7 @@ control, TTL, blocking, and limits.
 | POST | `/reg` | Register a client identity |
 | GET | `/regcheck` | Look up a client identity |
 | GET | `/ping` | Return the server's commit hash |
+| POST/GET | `/mcp` | MCP Streamable HTTP endpoint |
 | GET | `/doc` | List embedded documentation |
 | GET | `/doc/{name}` | Return a documentation file |
 
@@ -255,6 +256,34 @@ Response (200):
 The `commit` field is empty if the binary was built without
 `-ldflags "-X github.com/morphism/ace.Commit=..."`.
 
+## POST/GET /mcp
+
+Remote MCP uses the Streamable HTTP transport on `/mcp`.
+`POST /mcp` accepts one MCP JSON-RPC message in the request
+body. Requests return `application/json` with a JSON-RPC
+response. Notifications and client responses return 202 with
+no body.
+
+Clients should include:
+
+```http
+Accept: application/json, text/event-stream
+Content-Type: application/json
+MCP-Protocol-Version: 2025-06-18
+```
+
+If `--mcp-token` or `ACE_MCP_TOKEN` is set, clients must also
+include:
+
+```http
+Authorization: Bearer TOKEN
+```
+
+When `--mcp-origins` is set, browser requests whose `Origin`
+header is not listed return 403. `GET /mcp` returns 405
+because ACE does not currently maintain an unsolicited
+server-to-client SSE stream.
+
 ## GET /doc
 
 Returns a plain-text index listing the embedded
@@ -267,6 +296,7 @@ ACE is a coordination service for software agents based on the tuple-space model
   /doc/docs/spec.md
   /doc/docs/http-spec.md
   /doc/docs/cli-spec.md
+  /doc/docs/mcp-spec.md
   /doc/docs/guide.md
   /doc/docs/skill.md
 ```

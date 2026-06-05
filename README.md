@@ -8,8 +8,9 @@ reading JSON objects. Agents coordinate through the objects
 themselves, matched by patterns, without knowing about each
 other.
 
-ACE is built with Go and SQLite and exposes an HTTP API and
-a CLI.
+ACE is built with Go and SQLite and exposes an HTTP API, a
+CLI, an MCP stdio server, and remote MCP over Streamable
+HTTP.
 
 ## Background
 
@@ -377,6 +378,7 @@ up to execute their queries.
 | [Specification](docs/spec.md) | Operations, matching, access, TTL, limits |
 | [HTTP API](docs/http-spec.md) | Endpoints, request/response formats |
 | [CLI reference](docs/cli-spec.md) | Subcommands, flags, stdin behavior |
+| [MCP interface](docs/mcp-spec.md) | MCP tools, arguments, and stdio behavior |
 | [Usage guide](docs/guide.md) | Worked examples for three scenarios |
 | [Related systems](docs/related.md) | Real-world analogs to the tuple-space model |
 | [Pattern extensions](docs/extensions.md) | Numeric and string inequality matching via Quamina fork |

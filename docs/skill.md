@@ -6,10 +6,12 @@ and retrieving them by pattern. A producer does not name a
 recipient; a consumer does not name a source. Agents coordinate
 through the content of the objects themselves.
 
-ACE exposes an HTTP API and a CLI. The HTTP API allows any number
-of agents to coordinate across networks through a shared server.
-The CLI operates directly on the local database or, with
-`--server`, against a remote ACE instance.
+ACE exposes an HTTP API, a CLI, local MCP over stdio, and
+remote MCP over Streamable HTTP. The HTTP API allows any
+number of agents to coordinate across networks through a
+shared server. The CLI operates directly on the local
+database or, with `--server`, against a remote ACE instance,
+while MCP exposes the same core operations as tools.
 
 ## Operations
 
