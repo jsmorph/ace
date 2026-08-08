@@ -444,6 +444,31 @@ func splitCSV(s string) []string {
 	return out
 }
 
+func parseKVObject(s string) (json.RawMessage, error) {
+	fields := make(map[string]string)
+	for _, pair := range strings.Split(s, ",") {
+		key, value, ok := strings.Cut(pair, "=")
+		if !ok {
+			return nil, fmt.Errorf("invalid --kv pair %q: expected key=value", pair)
+		}
+		key = strings.TrimSpace(key)
+		value = strings.TrimSpace(value)
+		if key == "" {
+			return nil, fmt.Errorf("invalid --kv pair %q: key is empty", pair)
+		}
+		if _, exists := fields[key]; exists {
+			return nil, fmt.Errorf("duplicate --kv key %q", key)
+		}
+		fields[key] = value
+	}
+
+	object, err := json.Marshal(fields)
+	if err != nil {
+		return nil, fmt.Errorf("encode --kv object: %w", err)
+	}
+	return object, nil
+}
+
 func checkHTTPError(resp *http.Response) {
 	if resp.StatusCode == http.StatusOK {
 		return
@@ -611,13 +636,28 @@ func cmdOut(args []string) {
 	dbPath := fs.String("db", "ace.db", "database file")
 	server := fs.String("server", "", "ACE server URL (default: $ACE_URL)")
 	object := fs.String("object", "", "JSON object")
+	kv := fs.String("kv", "", "comma-separated key=value fields")
 	accessStr := fs.String("access", "", "access JSON")
 	ttlStr := fs.String("ttl", "", "TTL (ISO 8601 duration)")
 	fs.Parse(args)
+	if *object != "" && *kv != "" {
+		log.Fatal("--object and --kv are mutually exclusive")
+	}
+
+	var singleObject json.RawMessage
+	if *object != "" {
+		singleObject = json.RawMessage(*object)
+	} else if *kv != "" {
+		var err error
+		singleObject, err = parseKVObject(*kv)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	if url := resolveServer(*server); url != "" {
-		if *object != "" {
-			remoteOut(url, json.RawMessage(*object), *accessStr, *ttlStr)
+		if singleObject != nil {
+			remoteOut(url, singleObject, *accessStr, *ttlStr)
 			return
 		}
 		var errs int
@@ -683,8 +723,8 @@ func cmdOut(args []string) {
 		}{ID: id})
 	}
 
-	if *object != "" {
-		if err := emit(json.RawMessage(*object)); err != nil {
+	if singleObject != nil {
+		if err := emit(singleObject); err != nil {
 			log.Fatal(err)
 		}
 		return
@@ -727,6 +767,7 @@ func cmdMatch(args []string, remove bool) {
 	dbPath := fs.String("db", "ace.db", "database file")
 	server := fs.String("server", "", "ACE server URL (default: $ACE_URL)")
 	pattern := fs.String("pattern", "", "JSON pattern (reads stdin if absent or -)")
+	kv := fs.String("kv", "", "comma-separated key=value fields")
 	since := fs.String("since", "", "timestamp filter")
 	callerID := fs.String("id", "", "caller identity for access control")
 	key := fs.String("key", "", "client key (default: $ACE_CLIENT_KEY)")
@@ -736,6 +777,9 @@ func cmdMatch(args []string, remove bool) {
 	llmURL := fs.String("llm-url", "", "LLM endpoint URL")
 	llmModel := fs.String("llm-model", "", "LLM model")
 	fs.Parse(args)
+	if *pattern != "" && *kv != "" {
+		log.Fatal("--pattern and --kv are mutually exclusive")
+	}
 
 	var wait time.Duration
 	if *waitStr != "" {
@@ -749,13 +793,21 @@ func cmdMatch(args []string, remove bool) {
 		wait = d
 	}
 
-	pat := *pattern
-	if pat == "" || pat == "-" {
+	var pat string
+	if *kv != "" {
+		raw, err := parseKVObject(*kv)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pat = string(raw)
+	} else if *pattern == "" || *pattern == "-" {
 		data, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			log.Fatalf("read stdin: %v", err)
 		}
 		pat = strings.TrimSpace(string(data))
+	} else {
+		pat = *pattern
 	}
 	if pat == "" {
 		log.Fatal("no pattern provided")

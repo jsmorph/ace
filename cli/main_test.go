@@ -4,10 +4,61 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/morphism/ace/core"
 )
+
+func TestParseKVObject(t *testing.T) {
+	raw, err := parseKVObject(" type=test, note=hello, expression=a=b, empty= ")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]string
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"type":       "test",
+		"note":       "hello",
+		"expression": "a=b",
+		"empty":      "",
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+	for key, value := range want {
+		if got[key] != value {
+			t.Errorf("field %q: got %q, want %q", key, got[key], value)
+		}
+	}
+}
+
+func TestParseKVObjectRejectsInvalidInput(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "missing equals", input: "type", want: "expected key=value"},
+		{name: "empty key", input: "=test", want: "key is empty"},
+		{name: "duplicate key", input: "type=test,type=other", want: "duplicate --kv key"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := parseKVObject(test.input)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("got error %q, want text %q", err, test.want)
+			}
+		})
+	}
+}
 
 func TestRunEmbCmp(t *testing.T) {
 	orig := compareEmbeddings

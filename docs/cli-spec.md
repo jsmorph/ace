@@ -101,17 +101,29 @@ formats.
 
 ## ace out
 
-Write an object into the space. If `--object` is given,
-write that single object. Otherwise read stdin line by line,
-treating each line as a separate JSON object. The command
-skips blank lines.
+Write an object into the space.  `--object` supplies one JSON
+object, while `--kv` builds one object from comma-separated
+`key=value` fields.  Each `--kv` value becomes a JSON string,
+and the parser splits a field at its first `=`.  The two flags
+are mutually exclusive.  When neither flag is present, the
+command reads one JSON object per nonblank stdin line.
 
 | Flag | Default | Purpose |
 |------|---------|---------|
 | `--server` | `$ACE_URL` | ACE server URL |
 | `--object` | (stdin) | JSON object |
+| `--kv` | (none) | Comma-separated string fields |
 | `--access` | (none) | Access control JSON |
 | `--ttl` | (none) | TTL as ISO 8601 duration |
+
+For example, this command writes
+`{"type":"test","note":"hello"}`.  Whitespace around keys
+and values is ignored.  Empty keys, fields without `=`, and
+duplicate keys produce errors.
+
+```sh
+ace out --kv type=test,note=hello
+```
 
 Each object produces one line of output:
 
@@ -127,6 +139,7 @@ Find and remove the earliest matching object.
 |------|---------|---------|
 | `--server` | `$ACE_URL` | ACE server URL |
 | `--pattern` | (stdin) | JSON pattern |
+| `--kv` | (none) | Comma-separated string fields |
 | `--since` | (none) | Only objects after this identifier |
 | `--id` | (none) | Caller identity for access control (requires `--insecure-ids` in remote mode) |
 | `--key` | `$ACE_CLIENT_KEY` | Client key for authentication |
@@ -136,17 +149,20 @@ Find and remove the earliest matching object.
 | `--llm-url` | (default endpoint) | LLM endpoint URL for `?` predicates |
 | `--llm-model` | `gpt-5-mini` | LLM model for `?` predicates |
 
-If `--pattern` is absent or `-`, the command reads the
-pattern from stdin. Output is a JSON result or `null` if no
-match exists. If `--wait` is set and no match exists
-immediately, the command blocks until a match appears or the
-deadline passes. When `--deletes` is set, the result includes
-a `delete_id` field.
+`--kv` builds a pattern whose values are JSON strings, using
+the same syntax and validation as `ace out --kv`.  It cannot
+be combined with `--pattern`.  If both flags are absent, or
+`--pattern` is `-`, the command reads the pattern from stdin.
+Output is a JSON result or `null` if no match exists.  If
+`--wait` is set and no match exists immediately, the command
+blocks until a match appears or the deadline passes.  When
+`--deletes` is set, the result includes a `delete_id` field.
 
 ## ace rd
 
-`ace rd` uses the same flags as `ace in`. The object remains
-in the space.
+`ace rd` uses the same flags as `ace in`.  The object remains
+in the space.  For example, `ace rd --kv type=test,note=hello`
+reads the earliest object with those string-valued fields.
 
 ## ace match
 

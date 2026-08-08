@@ -47,10 +47,13 @@ Remote mode ignores local database flags. Server configuration controls blocking
 
 ## Writing Objects
 
-Write one object:
+`--object` writes one JSON object.  `--kv` builds one object
+from comma-separated `key=value` fields and stores each value
+as a JSON string.  These input forms are mutually exclusive.
 
 ```sh
 ace out --object '{"type":"task","queue":"build","status":"ready","cmd":"make test"}'
+ace out --kv type=task,queue=build,status=ready
 ```
 
 Write many objects from stdin, one JSON object per line:
@@ -72,16 +75,22 @@ Objects default to a 72-hour TTL. The default maximum TTL is seven days.
 
 ## Claiming and Reading
 
-Use `in` to claim work. It removes the matching object unless explicit deletes are enabled.
+Use `in` to claim work.  It removes the matching object unless
+explicit deletes are enabled.  Supply a JSON pattern through
+`--pattern` or string-valued fields through `--kv`.
 
 ```sh
 ace in --pattern '{"type":"task","queue":"review","status":"ready"}'
+ace in --kv type=task,queue=review,status=ready
 ```
 
-Use `rd` to observe without consuming:
+Use `rd` to observe without consuming.  It leaves the matched
+object in the space.  It accepts the same `--pattern` and
+`--kv` input forms as `in`.
 
 ```sh
 ace rd --pattern '{"type":"state","component":"worker-7"}'
+ace rd --kv type=state,component=worker-7
 ```
 
 Use `--wait` when an agent should block for work instead of polling:

@@ -230,12 +230,32 @@ curl -X POST http://localhost:8000/in \
 
 The CLI commands operate on a local database by default.
 With `--server` (or the `$ACE_URL` environment variable),
-they send requests to a remote ACE server instead:
+they send requests to a remote ACE server instead.  The
+`out` command accepts JSON through `--object`, while `in` and
+`rd` accept JSON through `--pattern`.  For flat,
+string-valued objects and patterns, all three commands accept
+`--kv` with comma-separated `key=value` fields.  The parser
+splits each field at its first `=`, trims whitespace around
+keys and values, and preserves further `=` characters in the
+value.  It rejects missing separators, empty keys, and
+duplicate keys.  `--kv` cannot be combined with `--object`
+on `out` or with `--pattern` on `in` and `rd`.  When neither
+input flag is present, `out` reads newline-delimited JSON
+objects from stdin, while `in` and `rd` read one JSON pattern
+from stdin.
+
+Each `--kv` value becomes a JSON string.  For example,
+`--kv type=task,priority=1` produces
+`{"type":"task","priority":"1"}`.  The JSON flags support
+other JSON types, arrays, and nested objects.
 
 ```
 ace out --object '{"type":"task","payload":"compute"}'
+ace out --kv type=task,payload=compute
 ace rd --pattern '{"type":"task"}'
+ace rd --kv type=task
 ace in --pattern '{"type":"task"}'
+ace in --kv type=task
 ace del --delete-id <id>
 ace stats
 ace ping

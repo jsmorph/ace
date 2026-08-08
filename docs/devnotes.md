@@ -516,3 +516,31 @@ SELECT + UPDATE runs inside a transaction with
 expires, the old delete_id remains but `Del` rejects it due
 to the `invisible_until > now` check. A new `in` can then
 select the object and assign a fresh delete_id.
+
+## CLI Key-Value Objects and Patterns
+
+The `out`, `in`, and `rd` commands use the standard library's
+[`flag.String`](https://pkg.go.dev/flag#FlagSet.String) API
+to accept one comma-separated `--kv` argument.  The conversion
+stores every value as a string through
+[`json.Marshal`](https://pkg.go.dev/encoding/json#Marshal),
+which also escapes keys and values according to JSON rules.
+The generated JSON follows the same local and remote paths as
+`--object` or `--pattern`, according to the command.
+
+The parser splits each field at its first `=`, trims whitespace,
+and rejects missing separators, empty keys, and duplicate keys.
+Splitting at the first separator permits `=` inside a value.
+`out` rejects `--kv` with `--object`, while `in` and `rd`
+reject `--kv` with `--pattern`.  Each command therefore receives
+one JSON representation and never merges fields from two inputs.
+
+Plan:
+
+- [x] Parse comma-separated key-value fields into string-valued
+  JSON objects.
+- [x] Use generated objects and patterns in local and remote
+  modes.
+- [x] Test valid fields and malformed input.
+- [x] Document the flag in the README, CLI specification, and
+  embedded CLI skill.
