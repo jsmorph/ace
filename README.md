@@ -61,6 +61,11 @@ cursor-style iteration.
 `rd(callerID, pattern, wait, since)` works like `in` but
 does not remove the object.
 
+The Go `In` and `Rd` methods pass the caller's context through
+database queries, transactions, and dynamic matching.  A context
+deadline bounds the operation, including database connection waits.
+The `wait` argument controls waiting for a matching object.
+
 Each object receives a unique nanosecond-resolution timestamp
 as its identifier. Operations return the earliest matching
 object first.

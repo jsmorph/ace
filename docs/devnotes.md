@@ -544,3 +544,27 @@ Plan:
 - [x] Test valid fields and malformed input.
 - [x] Document the flag in the README, CLI specification, and
   embedded CLI skill.
+
+## Read and Take Cancellation
+
+`In` and `Rd` now pass the caller's context to SQL queries and
+transactions, including candidate scans and claims for dynamic matching.
+The previous SQL calls used background contexts.  Under concurrent use,
+a read could remain queued behind the space's single database connection
+after its caller cancelled it.
+
+The implementation uses
+[`DB.BeginTx`](https://pkg.go.dev/database/sql#DB.BeginTx),
+[`DB.QueryContext`](https://pkg.go.dev/database/sql#DB.QueryContext),
+and the corresponding transaction methods.  Cancellation before commit
+rolls back a take.  A completed take still returns its result.
+
+`go test ./core` passed.  A local test held a SQLite write lock while
+an `Out` occupied the space's connection.  Exact and dynamic `In` and
+`Rd` calls with 50 ms deadlines each returned in 51 ms or less.
+Releasing the lock allowed publication, and a later take recovered the
+object.
+
+- [x] Propagate contexts through matching queries and transactions.
+- [x] Test cancellation during database connection waits.
+- [x] Run the core tests and document the behavior.

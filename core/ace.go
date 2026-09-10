@@ -271,6 +271,9 @@ func (s *Space) fetch(ctx context.Context, callerID string, pattern json.RawMess
 
 func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (_ *Result, retErr error) {
 	defer s.logSlowOp(accessType)()
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if pattern.HasDynamic() {
 		return s.executeDynamicMatch(ctx, pattern, accessType, callerID, since, remove)
 	}
@@ -279,7 +282,7 @@ func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessT
 
 	if !remove {
 		var id, jsonStr string
-		err := s.db.QueryRow(query, args...).Scan(&id, &jsonStr)
+		err := s.db.QueryRowContext(ctx, query, args...).Scan(&id, &jsonStr)
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -289,7 +292,7 @@ func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessT
 		return &Result{ID: id, Object: json.RawMessage(jsonStr)}, nil
 	}
 
-	tx, err := s.db.Begin()
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("begin transaction: %w", err)
 	}
@@ -300,7 +303,7 @@ func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessT
 	}()
 
 	var id, jsonStr string
-	err = tx.QueryRow(query, args...).Scan(&id, &jsonStr)
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&id, &jsonStr)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -316,12 +319,12 @@ func (s *Space) executeMatch(ctx context.Context, pattern ParsedPattern, accessT
 			return nil, fmt.Errorf("generate delete id: %w", err)
 		}
 		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(timestampFormat)
-		if _, err := tx.Exec("UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ?", did, invisibleUntil, id); err != nil {
+		if _, err := tx.ExecContext(ctx, "UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ?", did, invisibleUntil, id); err != nil {
 			return nil, fmt.Errorf("mark invisible: %w", err)
 		}
 		result.DeleteID = did
 	} else {
-		if _, err := tx.Exec("DELETE FROM objects WHERE id = ?", id); err != nil {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM objects WHERE id = ?", id); err != nil {
 			return nil, fmt.Errorf("delete object: %w", err)
 		}
 	}
@@ -352,12 +355,15 @@ type matchCandidate struct {
 }
 
 func (s *Space) executeDynamicMatch(ctx context.Context, pattern ParsedPattern, accessType string, callerID string, since string, remove bool) (*Result, error) {
-	candidates, err := s.listMatchCandidates(pattern.Exact, accessType, callerID, since)
+	candidates, err := s.listMatchCandidates(ctx, pattern.Exact, accessType, callerID, since)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, candidate := range candidates {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		ok, err := matchWithProviders(ctx, candidate.Object, pattern, s.embedder, s.judge)
 		if err != nil {
 			return nil, err
@@ -370,7 +376,7 @@ func (s *Space) executeDynamicMatch(ctx context.Context, pattern ParsedPattern, 
 			return &Result{ID: candidate.ID, Object: candidate.Object}, nil
 		}
 
-		result, claimed, err := s.claimCandidate(candidate)
+		result, claimed, err := s.claimCandidate(ctx, candidate)
 		if err != nil {
 			return nil, err
 		}
@@ -382,10 +388,10 @@ func (s *Space) executeDynamicMatch(ctx context.Context, pattern ParsedPattern, 
 	return nil, nil
 }
 
-func (s *Space) listMatchCandidates(branches []PatternBranch, accessType string, callerID string, since string) ([]matchCandidate, error) {
+func (s *Space) listMatchCandidates(ctx context.Context, branches []PatternBranch, accessType string, callerID string, since string) ([]matchCandidate, error) {
 	query, args := BuildScanQuery(branches, accessType, callerID, since, time.Now())
 
-	rows, err := s.db.Query(query, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("query candidates: %w", err)
 	}
@@ -409,8 +415,8 @@ func (s *Space) listMatchCandidates(branches []PatternBranch, accessType string,
 	return candidates, nil
 }
 
-func (s *Space) claimCandidate(candidate matchCandidate) (_ *Result, claimed bool, retErr error) {
-	tx, err := s.db.Begin()
+func (s *Space) claimCandidate(ctx context.Context, candidate matchCandidate) (_ *Result, claimed bool, retErr error) {
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, false, fmt.Errorf("begin transaction: %w", err)
 	}
@@ -432,7 +438,7 @@ func (s *Space) claimCandidate(candidate matchCandidate) (_ *Result, claimed boo
 			return nil, false, fmt.Errorf("generate delete id: %w", err)
 		}
 		invisibleUntil := time.Now().UTC().Add(s.cfg.VisibilityTimeout).Format(timestampFormat)
-		res, err := tx.Exec(
+		res, err := tx.ExecContext(ctx,
 			"UPDATE objects SET delete_id = ?, invisible_until = ? WHERE id = ? AND expires > ? AND (invisible_until IS NULL OR invisible_until <= ?)",
 			did, invisibleUntil, candidate.ID, now, now,
 		)
@@ -448,7 +454,7 @@ func (s *Space) claimCandidate(candidate matchCandidate) (_ *Result, claimed boo
 		}
 		result.DeleteID = did
 	} else {
-		res, err := tx.Exec(
+		res, err := tx.ExecContext(ctx,
 			"DELETE FROM objects WHERE id = ? AND expires > ? AND (invisible_until IS NULL OR invisible_until <= ?)",
 			candidate.ID, now, now,
 		)
